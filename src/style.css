@@ -1,0 +1,65 @@
+/* src/style.css */
+
+/* 强制重置 html 和 body，确保占满屏幕 */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #05070a; /* 统一深色背景 */
+  font-family: 'Inter', 'Roboto Mono', sans-serif; /* 统一全局字体 */
+  overflow: hidden; /* 禁止最外层滚动，由内部容器接管 */
+}
+
+/* 确保 Vue 的挂载点 #app 也是全屏的 */
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+/* --- 全局滚动条美化 (Global Scrollbar Styling) --- */
+
+/* 滚动条整体宽度/高度 */
+::-webkit-scrollbar {
+  width: 6px;  /* 纵向滚动条宽度 */
+  height: 6px; /* 横向滚动条高度 */
+}
+
+/* 滚动条轨道 (Track) */
+::-webkit-scrollbar-track {
+  background: transparent; /* 透明轨道，不干扰背景 */
+  border-radius: 3px;
+}
+
+/* 滚动条滑块 (Thumb) */
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 210, 255, 0.15); /* 科技青色，半透明 */
+  border-radius: 3px; /* 圆角 */
+  border: 1px solid rgba(0, 0, 0, 0.1); /* 极细的边框增加层次感 */
+  transition: background 0.2s;
+}
+
+/* 滑块悬停状态 (Hover) */
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 210, 255, 0.4); /* 悬停时变亮 */
+  cursor: pointer;
+}
+
+/* 滚动条角落 (Corner) */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* --- 通用工具类 --- */
+
+/* 强制隐藏滚动条但保留滚动功能 (可选) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

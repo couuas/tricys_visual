@@ -1,0 +1,29 @@
+{
+  "name": "tricys_vis",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dev:all": "concurrently \"npm run dev\" \"cd ../tricys_backend && uvicorn main:app --reload --port 8000\""
+  },
+  "dependencies": {
+    "axios": "^1.13.4",
+    "chart.js": "^4.5.1",
+    "markdown-it": "^14.1.0",
+    "marked": "^17.0.1",
+    "sass": "^1.94.2",
+    "three": "^0.181.2",
+    "uuid": "^13.0.0",
+    "vue": "^3.5.24",
+    "vue-router": "^4.6.3",
+    "vue3-grid-layout-next": "^1.0.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "concurrently": "^9.1.2",
+    "vite": "^7.2.4"
+  }
+}
