@@ -1,6 +1,6 @@
 <template>
   <div class="file-node">
-    <div class="file-row" @click="toggle" :class="{ 'is-dir': isDir }">
+    <div class="file-row" @click="handleClick" @dblclick="handleDblClick" :class="{ 'is-dir': isDir }">
       <div class="col-name" :style="{ paddingLeft: depth * 20 + 'px' }">
         <span class="file-icon" v-if="isDir">
              {{ isOpen ? '📂' : '📁' }}
@@ -9,22 +9,20 @@
         <span class="file-text">{{ file.name }}</span>
       </div>
       <div class="col-size">{{ formatSize(file.size) }}</div>
-      <div class="col-action">
-        <a v-if="!isDir" :href="getDownloadUrl(file.path)" class="download-btn" target="_blank" download @click.stop>
-          ⬇
-        </a>
-      </div>
+      <div class="col-action"></div>
     </div>
     
     <!-- Recursive Children -->
     <div v-if="isDir && isOpen" class="file-children">
-        <ResultFileNode 
-            v-for="child in file.children" 
-            :key="child.path" 
-            :file="child" 
-            :taskId="taskId"
-            :depth="depth + 1"
-        />
+      <ResultFileNode 
+        v-for="child in file.children" 
+        :key="child.path" 
+        :file="child" 
+        :taskId="taskId"
+        :depth="depth + 1"
+        @select-file="emitSelectFile"
+        @open-hdf5="emitOpenHdf5"
+      />
     </div>
   </div>
 </template>
@@ -38,11 +36,28 @@ const props = defineProps({
   depth: { type: Number, default: 0 }
 });
 
+const emit = defineEmits(['select-file', 'open-hdf5']);
+
 const isOpen = ref(false);
 const isDir = computed(() => props.file.type === 'directory');
 
-const toggle = () => {
-    if(isDir.value) isOpen.value = !isOpen.value;
+const emitSelectFile = (payload) => emit('select-file', payload);
+const emitOpenHdf5 = (payload) => emit('open-hdf5', payload);
+
+const handleClick = () => {
+  if (isDir.value) {
+    isOpen.value = !isOpen.value;
+    return;
+  }
+  emit('select-file', props.file);
+};
+
+const handleDblClick = () => {
+  if (isDir.value) return;
+  const name = props.file.name || '';
+  if (name.toLowerCase().endsWith('.h5')) {
+    emit('open-hdf5', props.file);
+  }
 };
 
 const formatSize = (bytes) => {
@@ -54,11 +69,6 @@ const formatSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const BACKEND_URL = 'http://localhost:8000';
-
-const getDownloadUrl = (filePath) => {
-  return `${BACKEND_URL}/api/v1/tasks/${props.taskId}/files/download?path=${filePath}`;
-};
 </script>
 
 <style scoped>
@@ -77,16 +87,5 @@ const getDownloadUrl = (filePath) => {
 .file-text { font-family: 'Consolas', monospace; }
 
 .col-size { width: 80px; text-align: right; color: #666; font-size: 11px; }
-.col-action { width: 60px; display: flex; justify-content: flex-end; }
-
-.download-btn {
-  background: rgba(0, 210, 255, 0.1);
-  color: #00d2ff;
-  border: 1px solid rgba(0, 210, 255, 0.2);
-  width: 24px; height: 24px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 4px; text-decoration: none;
-  transition: all 0.2s;
-}
-.download-btn:hover { background: #00d2ff; color: #000; }
+.col-action { width: 0; display: none; }
 </style>

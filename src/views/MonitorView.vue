@@ -4,16 +4,6 @@
     <!-- Header removed, global layout -->
 
     <div class="dashboard-body">
-      <!-- Left Sidebar: Task List -->
-      <div class="sidebar-panel">
-        <TaskList 
-          :tasks="tasks" 
-          :selectedId="selectedTaskId" 
-          @select="handleTaskSelect" 
-          @refresh="fetchTasks"
-          @delete="handleDeleteTask"
-        />
-      </div>
 
       <!-- Main Content: Task Detail -->
       <div class="main-panel">
@@ -27,12 +17,18 @@
              :logs="currentTask.logs"
              @stop="handleStopTask"
              @view-results="handleViewResults"
+             @back="handleBack"
            />
         </div>
-        <div v-else class="empty-selection">
-           <div class="empty-icon">←</div>
-           <p>SELECT A MISSION TO MONITOR</p>
+        <div v-else class="dashboard-wrapper">
+           <!-- [NEW] Dashboard Mode -->
+           <MonitorDashboard 
+             :tasks="tasks" 
+             @view-task="handleTaskSelect"
+             @view-result="handleDirectViewResult"
+           />
         </div>
+
       </div>
     </div>
   </div>
@@ -41,9 +37,11 @@
 <script setup>
 import { ref, onMounted, onUnmounted, reactive } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import TaskList from '../components/monitor/TaskList.vue';
+// TaskList removed
 import TaskStatusPanel from '../components/monitor/TaskStatusPanel.vue';
+import MonitorDashboard from '../components/monitor/MonitorDashboard.vue'; // [NEW]
 import { $notify } from '../utils/notification';
+
 import { taskApi } from '../api/task';
 
 const router = useRouter();
@@ -65,8 +63,7 @@ let ws = null;
 let pollTimer = null;
 let elapsedTimer = null; // Timer for elapsed/ETA
 
-// [Mock Data Capability]
-const isMock = ref(false); 
+
 
 const fetchTasks = async () => {
   try {
@@ -75,16 +72,13 @@ const fetchTasks = async () => {
   } catch (e) {
     console.error("Fetch tasks failed", e);
     // Keep mock fallback if needed, or empty
-    if (tasks.value.length === 0) {
-        // Mock fallback for UI demo
-        isMock.value = true;
-        tasks.value = [
-            { id: 'mock-001', name: 'Demo Iteration Primary', status: 'RUNNING', created_at: new Date().toISOString() },
-            { id: 'mock-002', name: 'Sensitivity Sweep A', status: 'COMPLETED', created_at: new Date(Date.now() - 3600000).toISOString() },
-            { id: 'mock-003', name: 'Failed Config Test', status: 'ERROR', created_at: new Date(Date.now() - 7200000).toISOString() }
-        ];
-    }
   }
+};
+
+const handleBack = () => {
+  selectedTaskId.value = null;
+  disconnectWS();
+  fetchTasks();
 };
 
 const handleTaskSelect = (id) => {
@@ -181,11 +175,6 @@ const fetchTaskLogs = async (id) => {
 };
 
 const connectWS = (id) => {
-  if (isMock.value) {
-     if (id === 'mock-001') startMockStream();
-     return;
-  }
-
   const token = localStorage.getItem('tricys_auth_token');
   
   // Dynamic WebSocket URL Construction
@@ -251,7 +240,6 @@ const connectWS = (id) => {
 
 const disconnectWS = () => {
   if (ws) { ws.close(); ws = null; }
-  stopMockStream();
   stopElapsedTimer(); // Stop ticker
 };
 
@@ -301,20 +289,29 @@ const liveLog = (content, level='INFO') => {
 };
 
 const handleStopTask = async () => {
-   if (isMock.value) {
-       currentTask.status = 'STOPPED';
-       liveLog("Task manually terminated by user.", "WARN");
-       return;
-   }
   try {
        await taskApi.stopTask(selectedTaskId.value);
        $notify({ title: 'STOPPING', message: 'Stop signal sent.', type: 'process' });
    } catch (e) { $notify({ title: 'ERROR', message: 'Stop failed', type: 'error' }); }
 };
 
+const handleDirectViewResult = (task) => {
+  if (task && task.id) {
+    router.push({ name: 'visualizer', query: { task_id: task.id, projectId: task.project_id } });
+  }
+};
+
 const handleViewResults = () => {
   if (selectedTaskId.value) {
-    router.push({ name: 'result', query: { task_id: selectedTaskId.value } });
+    const t = tasks.value.find(x => x.id === selectedTaskId.value);
+    
+    // Check type
+    // Note: Task API might need to return 'type' field explicitly if not already present. 
+    // Usually backend assumes 'type' in task model. We'll check if it's available.
+    // Fallback: If name starts with "Analysis_" or implicitly from logic. But robust way is `task.type`.
+    
+    // Unified redirection to VisualizerView
+    router.push({ name: 'visualizer', query: { task_id: selectedTaskId.value, projectId: t.project_id } });
   }
 };
 
@@ -339,26 +336,7 @@ const handleDeleteTask = async (id) => {
   }
 };
 
-// Mock Stream Logic
-let mockInterval = null;
-const startMockStream = () => {
-    stopMockStream();
-    let p = 0;
-    mockInterval = setInterval(() => {
-        p += 5;
-        if (p > 100) p = 100;
-        currentTask.progress = p;
-        liveLog(`Processing chunk ${p}...`);
-        if (p === 100) {
-            currentTask.status = 'COMPLETED';
-            liveLog("Task Completed Successfully", "INFO");
-            clearInterval(mockInterval);
-        }
-    }, 1000);
-};
-const stopMockStream = () => {
-    if (mockInterval) clearInterval(mockInterval);
-};
+
 
 onMounted(async () => {
     await fetchTasks();
@@ -408,11 +386,13 @@ onUnmounted(() => {
 /* Dashboard Body */
 .dashboard-body { flex: 1; display: flex; overflow: hidden; }
 
-.sidebar-panel { width: 300px; border-right: 1px solid #30363d; background: #0d1117; }
+
 
 .main-panel { flex: 1; background: #05070a; position: relative; }
 
 .detail-container { width: 100%; height: 100%; padding: 0; }
+
+.dashboard-wrapper { width: 100%; height: 100%; overflow: hidden; }
 
 .empty-selection { 
   width: 100%; height: 100%; display: flex; flex-direction: column; 
@@ -420,4 +400,5 @@ onUnmounted(() => {
 }
 .empty-icon { font-size: 40px; margin-bottom: 20px; animation: bounce 2s infinite; }
 @keyframes bounce { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-10px); } }
+
 </style>

@@ -6,8 +6,8 @@
       <!-- UN-AUTHENTICATED: Login/Register Forms -->
       <div v-if="!isAuthenticated" class="auth-container fade-in">
         <div class="auth-header">
-           <div class="auth-logo">☢ TRICYS</div>
-           <div class="auth-sub">Tritium Cycle Simulation Platform</div>
+           <div class="auth-logo">⚛ TRICYS</div>
+           <div class="auth-sub">TRitium Integrated CYcle Simulation</div>
         </div>
 
         <!-- Toggle Switch -->
@@ -92,7 +92,7 @@
  
                    <!-- Demo Card -->
                    <div class="create-card demo">
-                      <div class="icon">☢</div>
+                      <div class="icon">⚛</div>
                       <div class="c-title">SYSTEM DEMO</div>
                       <div class="c-desc">Load reference cycle</div>
                       <button class="btn-action" @click="openDemo" :disabled="isAnyProcessing">

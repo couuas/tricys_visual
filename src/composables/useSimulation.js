@@ -29,6 +29,7 @@ const connectionStyles = ref({});
 const defaultConnectionStyle = {
   color: '#FFD700', type: 'flow', speed: 1.0, opacity: 0.9, width: 4.0
 };
+const CONNECTION_STYLES_KEY = '__connection_styles__';
 
 const analysisTasks = ref([]);
 const currentAnalysisTask = ref(null);
@@ -171,9 +172,24 @@ export function useSimulation() {
   const ignoreAlert = (id) => { ignoredComponents.add(id.toLowerCase()); activeAlert.value = null; };
   const confirmAlert = () => { activeAlert.value = null; };
 
+  const persistConnectionStyles = async () => {
+    if (!currentProjectId.value) return;
+    const mergedConfig = { ...(modelConfig.value || {}) };
+    mergedConfig[CONNECTION_STYLES_KEY] = { ...(connectionStyles.value || {}) };
+    modelConfig.value = mergedConfig;
+    try {
+      await projectApi.saveVisualConfig(currentProjectId.value, mergedConfig);
+    } catch (e) {
+      console.error('Failed to save connection styles', e);
+    }
+  };
+
   const getConnectionStyle = (id) => connectionStyles.value[id] || { ...defaultConnectionStyle };
-  const updateConnectionStyle = (id, style) => { connectionStyles.value[id] = { ...defaultConnectionStyle, ...style }; };
-  const syncAllConnections = (style) => {
+  const updateConnectionStyle = async (id, style) => {
+    connectionStyles.value[id] = { ...defaultConnectionStyle, ...style };
+    await persistConnectionStyles();
+  };
+  const syncAllConnections = async (style) => {
     if (!structureData.value || !structureData.value.connections) return;
     const newStyles = { ...connectionStyles.value };
     if (newStyles['ALL']) delete newStyles['ALL'];
@@ -182,6 +198,7 @@ export function useSimulation() {
       newStyles[id] = JSON.parse(JSON.stringify(style));
     });
     connectionStyles.value = newStyles;
+    await persistConnectionStyles();
   };
 
   const loadData = async (projectId = null) => {
@@ -198,6 +215,7 @@ export function useSimulation() {
       const project = await projectApi.getProject(pid);
       structureData.value = project.structure || { components: [], connections: [] };
       modelConfig.value = project.visual_config || {};
+      connectionStyles.value = modelConfig.value?.[CONNECTION_STYLES_KEY] || {};
 
       // Determine Read-Only Status
       const { currentUser } = useAuth();
@@ -308,6 +326,37 @@ export function useSimulation() {
     multiSelectedIds.value.clear(); componentGroups.value = {}; expandedGroupId.value = null;
 
     graphSelectedIds.value = new Set(['sds', 'plasma', 'tes']);
+  };
+
+  const revertParam = async (compId, paramName) => {
+    const fullName = compId === 'global' ? paramName : `${compId}.${paramName}`;
+    const target = componentParams.value.find(p => p.name === fullName);
+    if (target) {
+      const def = defaultParams.value.find(p => p.name === fullName);
+      if (def) {
+        target.value = def.defaultValue;
+        // Persist change
+        await saveParameters(componentParams.value);
+      }
+    }
+  };
+
+  const updateParam = async (compId, paramName, newValue) => {
+    const fullName = compId === 'global' ? paramName : `${compId}.${paramName}`;
+    const target = componentParams.value.find(p => p.name === fullName);
+
+    if (target) {
+      target.value = newValue;
+    } else {
+      // Add new parameter
+      componentParams.value.push({
+        name: fullName,
+        value: newValue,
+        defaultValue: newValue // Assuming new param default is self
+      });
+    }
+
+    await saveParameters(componentParams.value);
   };
 
   const saveParameters = async (params) => {
@@ -522,7 +571,7 @@ export function useSimulation() {
     graphSelectedIds,
 
     // Methods
-    loadData, loadModelConfig, loadAnnotations, resetSession,
+    loadData, loadModelConfig, loadAnnotations, resetSession, revertParam, updateParam,
     play, pause, setTime, stepTime, togglePlay,
     saveParameters, saveAnnotations, saveComponentPosition, saveAlertRules, ignoreAlert, confirmAlert,
     getCurrentDataSlice, clearResults, updateDashboardVisibility, fetchLibraryModels, toggleDashboardPref,

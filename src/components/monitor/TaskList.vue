@@ -18,7 +18,10 @@
         </div>
         
         <div class="task-main">
-          <div class="task-name">{{ task.name || 'Unnamed Task' }}</div>
+          <div class="task-name">
+            <span v-if="isAnalysis(task)" class="type-tag" title="Analysis Job">⚡</span>
+            {{ task.name || 'Unnamed Task' }}
+          </div>
           <div class="task-meta">
             <span class="task-id">{{ task.id.slice(0, 8) }}</span>
             <span class="task-time">{{ formatTime(task.created_at) }}</span>
@@ -67,6 +70,10 @@ const formatTime = (isoString) => {
   const d = new Date(isoString);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
+
+const isAnalysis = (t) => {
+    return t && (t.type === 'analysis' || (t.config_json && t.config_json.type === 'analysis'));
+};
 </script>
 
 <style scoped>
@@ -110,6 +117,7 @@ const formatTime = (isoString) => {
 .status-indicator.error { background: #ff5252; }
 
 .task-main { flex: 1; min-width: 0; }
+.type-tag { font-size: 10px; margin-right: 4px; color: #ffeb3b; }
 .task-name { font-size: 13px; font-weight: 600; color: #ccc; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-item.active .task-name { color: #fff; }
 .task-meta { display: flex; gap: 8px; font-size: 10px; color: #666; font-family: monospace; }

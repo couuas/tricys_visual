@@ -21,24 +21,9 @@
        <span class="icon">🔒</span> READ ONLY PREVIEW
     </div>
 
-    <!-- Toolbar Removed (Moved to Bottom) -->
-
     <div class="workspace-grid" :style="gridStyle">
       
-      <div class="grid-area-top" v-if="isDashboardDocked && hasSimulationData">
-         <DashboardPanel 
-           :embedded="true" 
-           @toggle-dock="isDashboardDocked = false" 
-         />
-      </div>
 
-      <div 
-        v-if="isDashboardDocked && hasSimulationData" 
-        class="grid-resizer horizontal" 
-        @mousedown="startResize('vertical', $event)"
-      >
-        <div class="resizer-handle"></div>
-      </div>
 
       <div 
         class="grid-area-center"
@@ -193,106 +178,56 @@
       </div>
     </div>
 
-    <!-- BottomConsole Removed -->
+    <SimulationConfigModal 
+        :visible="showSimSettingsModal" 
+        :model-metadata="modelMetadata"
+        @close="showSimSettingsModal = false"
+        @simulation-started="handleSimulationStarted"
+    />
 
-    <transition name="fade">
-      <div v-if="showSimSettingsModal" class="settings-modal-overlay">
-        <div class="settings-card">
-          <div class="modal-header">
-            <h3>SIMULATION CONFIG</h3>
-            <button class="close-modal" @click="showSimSettingsModal = false">✕</button>
-          </div>
-          <div class="modal-body">
-            <div class="form-group">
-              <label>Model ID</label>
-              <input type="text" v-model="simSettings.modelName" disabled class="input-disabled">
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label>Stop Time (s)</label><input type="number" v-model.number="simSettings.stopTime" step="100" :disabled="isReadOnly"></div>
-              <div class="form-group"><label>Step Size (s)</label><input type="number" v-model.number="simSettings.stepSize" step="0.1" :disabled="isReadOnly"></div>
-            </div>
-            <div class="modified-params-section" v-if="hasModifiedParams">
-              <label>Modified Parameters ({{ flatModifiedParams.length }})</label>
-              <div class="params-scroll-box">
-                <div v-for="(p, idx) in flatModifiedParams" :key="idx" class="mod-param-row">
-                  <span class="p-key">{{ p.displayKey }}</span><span class="p-val" :title="p.value">{{ formatParamValue(p.value) }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="modified-params-section alert-section" v-if="activeRulesList.length > 0">
-              <label>Active Alerts ({{ activeRulesList.length }})</label>
-              <div class="params-scroll-box">
-                <div v-for="rule in activeRulesList" :key="rule.id" class="mod-param-row alert-row-preview">
-                  <span class="p-key">{{ rule.id.toUpperCase() }}</span><span class="p-val">{{ rule.operator }} {{ rule.threshold }}</span>
-                </div>
-              </div>
-            </div>
-             <div class="info-box" v-if="!hasModifiedParams && activeRulesList.length === 0">
-              <span class="info-icon">ℹ</span><span class="info-text">Using default configuration.</span>
-            </div>
-          </div>
-          <div class="modal-footer">
-
-            <button class="btn-cancel" @click="showSimSettingsModal = false">CANCEL</button>
-            <button class="btn-confirm" @click="confirmRunSimulation" :disabled="isReadOnly">
-                {{ isReadOnly ? 'ACCESS DENIED' : 'INITIATE ▶' }}
-            </button>
-          </div>
-          <div class="modal-footer-secondary">
-             <label class="enhanced-mode-toggle">
-                <input type="checkbox" v-model="isEnhancedMode">
-                <span>Enable Enhanced Mode (--enhanced)</span>
-             </label>
-          </div>
-        </div>
-      </div>
-    </transition>
-
-    <transition name="fade">
-      <div v-if="showEnhancedModal" class="settings-modal-overlay enhanced-overlay">
-        <div class="settings-card enhanced-card">
-          <div class="modal-header">
-            <h3>ENHANCED CONFIGURATION</h3>
-            <button class="close-modal" @click="showEnhancedModal = false">✕</button>
-          </div>
-          <div class="modal-body enhanced-body">
-             <div class="json-editor-wrapper">
-                <textarea v-model="enhancedConfigJson" class="json-textarea" spellcheck="false"></textarea>
-             </div>
-             <div class="enhanced-info">
-                Manually edit the configuration JSON. Use with caution.
-                Ref: tricys_backend/tests structures.
-             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="showEnhancedModal = false">BACK</button>
-            <button class="btn-confirm" @click="submitEnhancedSimulation">SUBMIT & RUN ▶</button>
-          </div>
-        </div>
-      </div>
-    </transition>
+    <AnalysisConfigModal 
+        :visible="showAnalysisModal"
+        :model-metadata="modelMetadata"
+        @close="showAnalysisModal = false"
+        @analysis-started="handleSimulationStarted"
+    />
 
     <transition name="pop-in"><div v-if="activeAlert" class="alert-modal-overlay"><div class="alert-card"><div class="alert-header"><span class="alert-icon-lg">⚠️</span><h3>INVENTORY ALERT</h3></div><div class="alert-body"><div class="alert-info-row"><span class="lbl">Component:</span><span class="val">{{ activeAlert.id.toUpperCase() }}</span></div><div class="alert-info-row"><span class="lbl">Time:</span><span class="val">{{ activeAlert.time }} h</span></div><div class="alert-info-row"><span class="lbl">Value:</span><span class="val highlight">{{ activeAlert.value }} g</span></div><div class="alert-condition">Condition: Value {{ activeAlert.rule }}</div></div><div class="alert-footer"><button class="btn-ignore" @click="ignoreAlert(activeAlert.id)">Ignore</button><button class="btn-ack" @click="confirmAlert">Acknowledge</button></div></div></div></transition>
     
 
-    <!-- New Bottom Toolbar -->
-    <div class="view-toolbar-bottom" v-show="!isEditorMode && !(showUploadOverlay && !isDemo) && !isReadOnly">
-      <button 
-        class="action-btn-lg primary" 
-        :class="{ 'running': isSimulating, 'disabled': isReadOnly }"
-        @click.stop="!isReadOnly && handleSimButtonClick()" 
-      >
-         <span class="icon" v-if="isSimulating">⟳</span>
-         <span class="icon" v-else>▶</span>
-         <span class="label">{{ isReadOnly ? 'READ ONLY' : (isSimulating ? 'SYSTEM BUSY' : 'INITIATE SIMULATION') }}</span>
-      </button>
-      
-      <button class="action-btn-lg secondary" @click.stop="handleResetParameters" :disabled="isReadOnly">
-         <span class="icon">✕</span>
-         <span class="label">CLEAR</span>
-      </button>
+    <!-- Modern Floating Dock Toolbar -->
+    <div class="view-toolbar-float" v-show="!isEditorMode && !(showUploadOverlay && !isDemo) && !isReadOnly">
+      <div class="toolbar-dock">
 
+        <button 
+          class="dock-btn-hero primary" 
+          :class="{ 'running': isSimulating, 'disabled': isReadOnly }"
+          @click.stop="!isReadOnly && handleSimButtonClick()" 
+        >
+           <div class="btn-content">
+             <span class="icon-lg" v-if="isSimulating">⟳</span>
+             <span class="icon-lg" v-else>▶</span>
+             <div class="text-group">
+                <span class="btn-title">{{ isSimulating ? 'SIMULATION BUSY' : 'RUN SIMULATION' }}</span>
+                <span class="btn-sub">{{ isSimulating ? 'Processing...' : 'Start Basic Task' }}</span>
+             </div>
+           </div>
+           <div class="shine-effect"></div>
+        </button>
+        
+        <div class="vr-divider"></div>
 
+        <button class="dock-btn secondary" @click.stop="showAnalysisModal = true" :disabled="isReadOnly">
+           <span class="icon">⚡</span>
+           <span class="label">ANALYSIS</span>
+        </button>
+
+        <button class="dock-btn flat" @click.stop="handleResetParameters" :disabled="isReadOnly">
+           <span class="icon">✕</span>
+           <span class="label">CLEAR</span>
+        </button>
+
+      </div>
     </div>
 
     <transition name="fade"><button v-if="isEditorMode" class="exit-fs-btn" @click="exitFullscreen">✕ EXIT EDITOR</button></transition>
@@ -306,14 +241,13 @@ import { useRouter } from 'vue-router';
 import { useSimulation } from '../composables/useSimulation';
 import { $confirm } from '../utils/dialog';
 import { $notify, $updateNotification, closeNotification } from '../utils/notification';
-import { taskApi } from '../api/task'; // [NEW]
+import { taskApi } from '../api/task'; 
 
 import ThreeScene from '../components/ThreeScene.vue';
-import DashboardPanel from '../components/DashboardPanel.vue';
 import ComponentEditor from '../components/ComponentEditor.vue';
 import ConnectionEditor from '../components/ConnectionEditor.vue';
-
-// import BottomConsole from '../components/BottomConsole.vue'; // Removed for Config Refactor
+import SimulationConfigModal from '../components/SimulationConfigModal.vue'; 
+import AnalysisConfigModal from '../components/AnalysisConfigModal.vue'; // [NEW]
 
 const props = defineProps({ mode: { type: String, default: 'normal' } });
 const router = useRouter();
@@ -328,7 +262,7 @@ const {
   structureData,
   componentParams, defaultParams, // [Added]
   fetchHiddenComponents, 
-  saveHiddenComponents, isReadOnly   
+  saveHiddenComponents, isReadOnly, revertParam, updateParam 
 } = useSimulation();
 
 const selectedId = ref(null);
@@ -337,6 +271,7 @@ const isFullscreen = ref(false);
 const isEditorMode = ref(false);
 
 const showSimSettingsModal = ref(false);
+const showAnalysisModal = ref(false); // [NEW]
 const showSettingsMenu = ref(false);
 const showUploadOverlay = ref(false);
 const isReady = ref(false);
@@ -350,21 +285,17 @@ const isSidebarEditMode = ref(false);
 const hiddenComponents = ref(new Set()); 
 
 // Analysis Terminal State
-// const showBottomConsole = ref(true); // Removed
 const terminalHeight = ref(0); // Set to 0 to remove spacing 
 
-// Dashboard Dock State
-const isDashboardDocked = ref(false);
+// Dashboard Dock State - REMOVED
+// const isDashboardDocked = ref(false);
 
-const simSettings = reactive({ stopTime: 2000.0, stepSize: 0.5, modelName: "example_model.Cycle", packagePath: "" });
+const modelMetadata = ref({ packagePath: '', modelName: '' }); // [NEW] Shared model info
 const isSimulating = ref(false);
 const elapsedTime = ref(0);
 let timerInterval = null;
 let pollInterval = null;
 let simulationNotifyId = null; // [NEW] Notification ID for Sim
-const isEnhancedMode = ref(false);
-const showEnhancedModal = ref(false);
-const enhancedConfigJson = ref('');
 
 // Layout State
 const layoutState = reactive({
@@ -425,15 +356,14 @@ const handleSidebarItemClick = async (compId) => {
 
 const hasRightPanelContent = computed(() => !!selectedId.value || !!selectedConnectionId.value);
 const terminalLeftOffset = computed(() => {
-  if (isDashboardDocked.value && hasSimulationData.value) {
-    return layoutState.dashboardWidth + 6; 
-  }
-  return 0;
+    return 0;
 });
 
 const gridStyle = computed(() => {
-  const leftColWidth = (isDashboardDocked.value && hasSimulationData.value) ? `${layoutState.dashboardWidth}px` : '0px';
-  const resizerLeftWidth = (isDashboardDocked.value && hasSimulationData.value) ? '6px' : '0px';
+  // const leftColWidth = (isDashboardDocked.value && hasSimulationData.value) ? `${layoutState.dashboardWidth}px` : '0px';
+  // const resizerLeftWidth = (isDashboardDocked.value && hasSimulationData.value) ? '6px' : '0px';
+  const leftColWidth = '0px';
+  const resizerLeftWidth = '0px';
   const rightColWidth = (hasRightPanelContent.value) ? `${layoutState.rightWidth}px` : '0px';
   const resizerRightWidth = (hasRightPanelContent.value) ? '6px' : '0px';
   const cols = `${leftColWidth} ${resizerLeftWidth} 1fr ${resizerRightWidth} ${rightColWidth}`;
@@ -471,7 +401,7 @@ const startResize = (direction, event) => {
 
 watch(selectedId, (newVal) => { if (newVal && !isDashboardMode.value) selectedConnectionId.value = null; });
 watch(selectedConnectionId, (newVal) => { if (newVal && !isDashboardMode.value) selectedId.value = null; });
-watch(lastSimConfig, (newVal) => { if (newVal && newVal.simulation) { simSettings.stopTime = newVal.simulation.stop_time; simSettings.stepSize = newVal.simulation.step_size; simSettings.modelName = newVal.simulation.model_name; } }, { immediate: true });
+// watch(lastSimConfig, ...) -> Logic moved to child component but we can keep global watcher or just let onShow handle it
 
 const isDemo = computed(() => props.mode === 'demo');
 const statusText = computed(() => { if (isDemo.value) return hasSimulationData.value ? 'Demo Active' : 'Demo Model Ready'; return hasSimulationData.value ? 'Session Active' : 'Model View Only'; });
@@ -526,10 +456,10 @@ const handleUpload = async (event) => {
     if (res.ok) { 
       const responseData = await res.json();
       
-      // Update package path for simulation
+      // Update package path for simulation (Global state, so Component will pick it up)
       if (responseData.file_path) {
-        simSettings.packagePath = responseData.file_path;
-        simSettings.modelName = responseData.name || simSettings.modelName; // usage of name if returned, else keep default/extracted
+        modelMetadata.value.packagePath = responseData.file_path;
+        modelMetadata.value.modelName = responseData.name || modelMetadata.value.modelName;
       }
       
       showUploadOverlay.value = false; await loadModelConfig(); 
@@ -547,7 +477,7 @@ const handleUpload = async (event) => {
 const toggleDashboardMode = () => { _toggleDashboardMode(); };
 const handleMergeGroup = () => { if (multiSelectedIds.value.size < 2) return; const groupName = prompt("Enter name for the new group:", `System Group ${Math.floor(Math.random() * 100)}`); if (groupName) createGroup(groupName); };
 const onGlobalClick = () => closeSettingsMenu();
-const flatModifiedParams = computed(() => { const list = []; if (!modifiedParams.value) return list; for (const [compId, params] of Object.entries(modifiedParams.value)) { for (const [key, val] of Object.entries(params)) { const displayKey = key.startsWith(compId + '.') ? key : `${compId}.${key}`; list.push({ key, displayKey, value: val }); } } return list; });
+const flatModifiedParams = computed(() => { const list = []; if (!modifiedParams.value) return list; for (const [compId, params] of Object.entries(modifiedParams.value)) { for (const [key, val] of Object.entries(params)) { const displayKey = key.startsWith(compId + '.') ? key : `${compId}.${key}`; list.push({ compId, key, displayKey, value: val }); } } return list; });
 const hasModifiedParams = computed(() => flatModifiedParams.value.length > 0);
 const activeRulesList = computed(() => { const list = []; if (!alertRules || !alertRules.value) return list; for(const [id, rule] of Object.entries(alertRules.value)) { if(rule.enabled) list.push({ id, ...rule }); } return list; });
 const simButtonText = computed(() => { if (isSimulating.value) return "RUNNING..."; if (hasSimulationData.value) return "CLEAR DATA"; return "SIMULATE"; });
@@ -555,117 +485,18 @@ const formatParamValue = (val) => { if (Array.isArray(val)) return `[${val.lengt
 const toggleSettingsMenu = () => { showSettingsMenu.value = !showSettingsMenu.value; };
 const closeSettingsMenu = () => { if (showSettingsMenu.value) showSettingsMenu.value = false; };
 const handleSimButtonClick = () => { if (hasSimulationData.value) doClearResults(); else showSimSettingsModal.value = true; };
-const confirmRunSimulation = () => { 
-  if (isEnhancedMode.value) {
-    // Generate base config and open Enhanced Modal
-    const config = generateConfigPayload();
-    enhancedConfigJson.value = JSON.stringify(config, null, 4);
-    showSimSettingsModal.value = false;
-    showEnhancedModal.value = true;
-  } else {
-    showSimSettingsModal.value = false; 
-    runSimulation(); 
-  }
+
+// Simulation Handling
+const handleSimulationStarted = () => {
+   showSimSettingsModal.value = false;
+   // Component handles redirect, parent just needs to know it started
+   // Maybe update button state? Component handles loading state internally but parent `isSimulating` button might need care.
+   // Parent uses global `isSimulating`? No, parent uses local.
+   // Component assumes responsibility for submission. Parent 'isSimulating' is redundant for submission phase, 
+   // but useful for 'polling' phase if we were polling here.
+   // Component redirects to Monitor, so this view unmounts anyway.
 };
 
-const generateConfigPayload = () => {
-    const baseVars = ['time']; 
-    // Note: structureData might be null if not loaded yet, but usually is for Sim
-    const structure = structureData.value || { components: [] };
-    const componentIds = structure.components ? structure.components.map(c => c.id) : [];
-    const componentVars = componentIds.map(id => `${id}.I[1]`); 
-    const filterString = [...baseVars, ...componentVars].join('|'); 
-    
-    const simParams = {}; 
-    let hasSweep = false;
-
-    flatModifiedParams.value.forEach(item => { 
-        let val = item.value;
-        if (typeof val === 'string') {
-            const trimmed = val.trim();
-            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-                try { 
-                    val = JSON.parse(trimmed); 
-                    if (Array.isArray(val)) hasSweep = true;
-                } catch(e) {}
-            }
-        } else if (Array.isArray(val)) {
-            hasSweep = true;
-        }
-        
-        // If val is array (sweep), use it directly. If scalar, wrap in [].
-        simParams[item.displayKey] = Array.isArray(val) ? val : [val]; 
-    }); 
-
-    return {
-      type: "BASIC",
-      name: `${simSettings.modelName}_Run_${new Date().toISOString().slice(11,19)}`,
-      project_id: router.currentRoute.value.query.projectId, // [NEW] Pass project ID
-      enhanced: isEnhancedMode.value, 
-      config_json: {
-        paths: { package_path: simSettings.packagePath || "uploaded_model.mo" }, 
-        simulation: { 
-            model_name: simSettings.modelName, 
-            variableFilter: filterString, 
-            stop_time: simSettings.stopTime, 
-            step_size: simSettings.stepSize 
-        }, 
-        simulation_parameters: simParams, 
-        metrics_definition: {
-            "Startup_Inventory": {
-                "source_column": "sds.I[1]",
-                "method": "calculate_startup_inventory"
-            },
-            "Self_Sufficiency_Time": {
-                "source_column": "sds.I[1]",
-                "method": "time_of_turning_point"
-            },
-            "Doubling_Time": {
-                "source_column": "sds.I[1]",
-                "method": "calculate_doubling_time"
-            }
-        },
-        active_alerts: activeRulesList.value 
-      }
-    };
-};
-
-const submitEnhancedSimulation = async () => {
-    try {
-        const payload = JSON.parse(enhancedConfigJson.value);
-        showEnhancedModal.value = false;
-        await submitTask(payload);
-    } catch (e) {
-        $notify({ title: 'JSON ERROR', message: e.message, type: 'error' });
-    }
-};
-
-// [MODIFIED] Simulation Logic with Persistent Notification
-// [MODIFIED] Simulation Logic - Submit and Redirect
-// Refactored submit logic
-const submitTask = async (taskPayload) => {
-    if (isSimulating.value) return; 
-    isSimulating.value = true;
-    
-    $notify({ title: 'SUBMITTING JOB', message: 'Transmitting configuration...', type: 'process', duration: 2000 });
-
-    try {
-        const taskData = await taskApi.createTask(taskPayload);
-        $notify({ title: 'JOB ACCEPTED', message: `Task ${taskData.id.slice(0,8)} initialized.`, type: 'success' });
-        
-        // Pass taskId to Monitor View
-        setTimeout(() => { router.push({ name: 'monitor', query: { taskId: taskData.id } }); }, 1000);
-
-    } catch (e) { 
-        isSimulating.value = false;
-        $notify({ title: 'SUBMIT ERROR', message: e.message || "Unknown error", type: 'error' });
-    }
-};
-
-const runSimulation = async () => { 
-  const payload = generateConfigPayload();
-  await submitTask(payload);
-};
 
 // [MODIFIED] Finish Logic
 const finishSimulation = async (success) => { 
@@ -730,8 +561,19 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 
 <style scoped>
 /* Base Styles */
-/* Base Styles */
 .vis-view { position: relative; width: 100%; height: 100%; overflow: hidden; background: #05070a; display: flex; flex-direction: column; font-family: 'Inter', 'Roboto Mono', sans-serif; }
+
+/* Tabs */
+.sim-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #30363d; padding-bottom: 0px; }
+.sim-tabs button {
+    background: transparent; border: none; color: #666; padding: 10px; font-weight: 700; font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent;
+}
+.sim-tabs button.active { color: #00d2ff; border-bottom-color: #00d2ff; }
+.sim-tabs button:hover:not(.active) { color: #bbb; }
+
+/* Analysis Wizard */
+
+
 
 /* Top Bar */
 
@@ -1032,6 +874,44 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
   padding-left: 25px; /* 悬停时稍微向右动 */
 }
 
+/* Analysis Collapsible */
+.analysis-collapsible-section {
+    border: 1px solid #30363d;
+    background: #161b22;
+    border-radius: 4px;
+    margin-top: 20px;
+    overflow: hidden;
+}
+.analysis-collapse-head {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: #21262d;
+    border: none;
+    color: #ccc;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+}
+.analysis-collapse-head:hover {
+    background: #30363d;
+    color: #fff;
+}
+.analysis-collapse-head.expanded {
+    background: #1f3847;
+    color: #00d2ff;
+    border-bottom: 1px solid #30363d;
+}
+.analysis-collapse-head .icon {
+    font-size: 10px;
+    opacity: 0.7;
+}
+
 .tech-tab-item.active .tech-bar {
   background: linear-gradient(90deg, rgba(0, 210, 255, 0.6) 0%, rgba(0, 210, 255, 0.1) 100%);
 }
@@ -1118,6 +998,15 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 .config-tooltip::before { content: ''; position: absolute; top: -6px; left: 20px; width: 10px; height: 10px; background: #00d2ff; transform: rotate(45deg); z-index: -1; }
 .tooltip-header { font-size: 10px; font-weight: 800; color: #666; letter-spacing: 1px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
 .conf-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+
+/* In-Input Suggestions */
+.input-wrapper { position: relative; }
+.input-wrapper.small { flex: 1; }
+.input-wrapper.medium { flex: 2; }
+.input-wrapper .mf-input { width: 100%; box-sizing: border-box; }
+.suggestions-list { position: absolute; top: 100%; left: 0; width: 100%; background: #1a1f26; border: 1px solid #30363d; z-index: 50; max-height: 150px; overflow-y: auto; list-style: none; margin: 0; padding: 0; list-style-type: none; }
+.suggestions-list li { padding: 6px 10px; cursor: pointer; color: #ccc; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.suggestions-list li:hover { background: #00d2ff; color: #000; }
 .conf-row { display: flex; justify-content: space-between; font-size: 12px; }
 .conf-row .label { color: #888; font-weight: 600; }
 .conf-row .value { color: #eee; font-family: "Consolas", monospace; }
@@ -1160,6 +1049,21 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 .alert-card { width: 400px; background: #1a0505; border: 1px solid #ff5252; box-shadow: 0 0 50px rgba(255, 82, 82, 0.2); overflow: hidden; animation: shake 0.4s ease-in-out; }
 .alert-header { background: #ff5252; color: #000; padding: 12px 20px; display: flex; align-items: center; gap: 10px; font-weight: bold; letter-spacing: 1px; }
 .alert-body { padding: 25px; color: #ffcccc; font-family: monospace; }
+/* Manual Params */
+.manual-param-section { margin-bottom: 1px; border-bottom: 2px solid #30363d; padding-bottom: 15px; }
+.add-btn-mini { background: rgba(0,210,255,0.1); border: 1px dashed #00d2ff; color: #00d2ff; width: 100%; padding: 8px; cursor: pointer; font-size: 11px; transition: all 0.2s; }
+.add-btn-mini:hover { background: rgba(0,210,255,0.2); }
+.manual-form { background: #161b22; padding: 10px; border: 1px solid #30363d; }
+.mf-row { display: flex; gap: 5px; margin-bottom: 8px; }
+.mf-input { background: #010409; border: 1px solid #30363d; color: #eee; padding: 6px; font-family: monospace; font-size: 11px; }
+.mf-input.small { flex: 1; }
+.mf-input.medium { flex: 2; }
+.mf-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.btn-save-mini, .btn-cancel-mini { padding: 4px 12px; font-size: 10px; cursor: pointer; border: none; }
+.btn-save-mini { background: #00d2ff; color: #000; font-weight: bold; }
+.btn-cancel-mini { background: #333; color: #ccc; }
+.clickable { cursor: pointer; transition: background 0.1s; }
+.clickable:hover { background: rgba(255,255,255,0.05); }
 .alert-info-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
 .alert-info-row .val { color: #fff; font-weight: bold; }
 .alert-info-row .val.highlight { color: #ff5252; font-size: 16px; text-shadow: 0 0 10px #ff5252; }
@@ -1174,7 +1078,9 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 .params-scroll-box::-webkit-scrollbar { width: 4px; }
 .params-scroll-box::-webkit-scrollbar-thumb { background: rgba(255, 202, 40, 0.4); border-radius: 2px; }
 .alert-section .params-scroll-box::-webkit-scrollbar-thumb { background: rgba(255, 82, 82, 0.5); }
-.mod-param-row { display: flex; justify-content: space-between; font-size: 11px; font-family: "Consolas", monospace; color: #ccc; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 2px; }
+.mod-param-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-family: "Consolas", monospace; color: #ccc; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 2px; }
+.reset-param-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; line-height: 1; margin-left: 8px; padding: 0; transition: color 0.2s; }
+.reset-param-btn:hover { color: #fe5050; }
 .mod-param-row:last-child { border-bottom: none; }
 .p-key { color: #e0e0e0; } .p-val { color: #ffca28; font-weight: bold; }
 .alert-row-preview { color: #ffcdd2; } .alert-row-preview .p-val { color: #ff5252; font-weight: 900; }
@@ -1206,6 +1112,103 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 
 .enhanced-overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); }
 .enhanced-card { width: 800px; height: 600px; display: flex; flex-direction: column; }
+/* [NEW] Layout Restructure */
+.config-modal-container {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: center;
+    position: relative;
+    z-index: 1001; /* Above overlay base */
+}
+
+/* Side Trigger Button */
+.analysis-side-trigger {
+    margin-top: 15px;
+    width: 100%;
+    background: rgba(30, 40, 50, 0.6);
+    border: 1px solid #30363d;
+    padding: 12px 16px;
+    border-radius: 6px;
+    color: #8b949e;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+.analysis-side-trigger:hover, .analysis-side-trigger.active {
+    background: rgba(0, 210, 255, 0.1);
+    border-color: #00d2ff;
+    color: #00d2ff;
+}
+.trigger-icon {
+    font-size: 10px;
+}
+
+/* Side Panel */
+.analysis-side-panel {
+    width: 400px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: 80vh;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+.panel-header {
+    padding: 15px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.panel-header h3 { margin: 0; font-size: 12px; color: #00d2ff; letter-spacing: 1px; }
+.close-panel {
+    background: none; border: none; color: #8b949e; font-size: 16px; cursor: pointer; padding: 0; line-height: 1;
+}
+.close-panel:hover { color: #fff; }
+.panel-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+.panel-footer {
+    padding: 15px;
+    border-top: 1px solid #30363d;
+    background: #161b22;
+}
+.small-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+.small-grid .type-card-mini {
+    padding: 10px;
+    min-height: 60px;
+}
+.small-grid .type-icon { font-size: 16px; margin-bottom: 4px; }
+.small-grid h4 { font-size: 11px; }
+
+/* Transitions */
+.slide-right-enter-active, .slide-right-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.slide-right-enter-from, .slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+.full-width { width: 100%; }
+
 .enhanced-body { flex: 1; padding: 0; display: flex; flex-direction: column; }
 .json-editor-wrapper { flex: 1; position: relative; }
 .json-textarea { 
@@ -1272,4 +1275,103 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
     backdrop-filter: blur(5px);
 }
 .readonly-badge .icon { font-size: 14px; }
+
+
+/* --- Modern Floating Dock Toolbar --- */
+
+.view-toolbar-float {
+  position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+  z-index: 500;
+  display: flex; justify-content: center;
+}
+
+.toolbar-dock {
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+  border-radius: 16px;
+  padding: 8px 12px;
+  display: flex; align-items: center; gap: 8px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.toolbar-dock:hover {
+  background: rgba(13, 17, 23, 0.95);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+}
+
+.vr-divider {
+  width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px;
+}
+
+/* Base Dock Button */
+.dock-btn {
+  background: transparent; border: none; color: #8b949e;
+  height: 40px; padding: 0 16px; border-radius: 8px;
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  cursor: pointer; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+
+.dock-btn .icon { font-size: 14px; }
+
+/* Secondary Variant (Analysis) */
+.dock-btn.secondary { color: #c9d1d9; background: rgba(255,255,255,0.03); border: 1px solid transparent; }
+.dock-btn.secondary:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.1); }
+.dock-btn.secondary:active { transform: scale(0.98); }
+
+/* Flat Variant (Clear) */
+.dock-btn.flat { color: #666; }
+.dock-btn.flat:hover { color: #f85149; background: rgba(248, 81, 73, 0.1); }
+
+/* Hero Button (Simulate) */
+.dock-btn-hero {
+  background: linear-gradient(135deg, #1f6feb, #00d2ff); /* Professional Blue-Cyan Gradient */
+  border: none;
+  height: 48px; padding: 0 20px 0 16px;
+  border-radius: 10px;
+  color: white;
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 110, 255, 0.3);
+  transition: all 0.3s;
+}
+
+.dock-btn-hero:hover {
+  filter: brightness(1.1); transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(0, 110, 255, 0.4);
+}
+.dock-btn-hero:active { transform: translateY(0); }
+
+.dock-btn-hero.running {
+   background: #30363d; cursor: wait; color: #8b949e; box-shadow: none;
+}
+
+.dock-btn-hero .btn-content {
+  display: flex; align-items: center; gap: 12px; z-index: 2;
+}
+
+.dock-btn-hero .icon-lg { font-size: 18px; }
+
+.dock-btn-hero .text-group {
+  display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1;
+}
+
+.dock-btn-hero .btn-title { font-size: 12px; font-weight: 800; letter-spacing: 0.5px; }
+.dock-btn-hero .btn-sub { font-size: 9px; opacity: 0.8; font-weight: 500; }
+
+/* Shine Effect */
+.shine-effect {
+  position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform: skewX(-20deg);
+  transition: 0.5s;
+}
+.dock-btn-hero:hover .shine-effect { left: 150%; transition: 0.7s; }
+
 </style>

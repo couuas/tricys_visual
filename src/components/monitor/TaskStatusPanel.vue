@@ -2,7 +2,10 @@
   <div class="task-status-panel">
     
     <div class="panel-header">
-      <h3>LIVE MONITOR</h3>
+      <div class="header-left">
+        <button class="back-btn" @click="$emit('back')">←</button>
+        <h3>LIVE MONITOR</h3>
+      </div>
       <div class="status-badge" :class="statusClass">
         {{ status }}
       </div>
@@ -81,7 +84,7 @@ const props = defineProps({
 const logContainer = ref(null);
 
 
-defineEmits(['stop', 'view-results']);
+defineEmits(['stop', 'view-results', 'back']);
 
 const isRunning = computed(() => ['RUNNING', 'PENDING'].includes(props.status));
 
@@ -130,7 +133,14 @@ watch(() => props.logs.length, () => {
 }
 
 .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #30363d; padding-bottom: 10px; }
+.header-left { display: flex; align-items: center; gap: 10px; }
 .panel-header h3 { margin: 0; font-size: 14px; letter-spacing: 1px; color: #fff; }
+
+.back-btn { 
+  background: none; border: none; color: #666; font-size: 18px; cursor: pointer; padding: 0; display: flex; align-items: center; 
+  transition: color 0.2s;
+}
+.back-btn:hover { color: #fff; }
 
 .status-badge { 
   font-size: 10px; padding: 4px 8px; border-radius: 4px; font-weight: 800; letter-spacing: 1px; 

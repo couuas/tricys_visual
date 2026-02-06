@@ -9,7 +9,7 @@
             <span class="icon">⬅</span>
           </button>
           <div class="brand-group">
-            <div class="logo-icon">☢</div>
+            <div class="logo-icon">⚛</div>
             <div class="logo-text">
               {{ id.toUpperCase() }} DASHBOARD
             </div>
@@ -144,8 +144,8 @@ import { useRouter, useRoute } from 'vue-router';
 import { GridLayout, GridItem } from 'vue3-grid-layout-next';
 import { v4 as uuidv4 } from 'uuid';
 import { marked } from 'marked'; 
-import { useSimulation } from '../composables/useSimulation';
 import Mini3DViewer from '../components/Mini3DViewer.vue';
+import { useSimulation } from '../composables/useSimulation';
 import { $confirm } from '../utils/dialog';
 import { $notify } from '../utils/notification'; 
 import { projectApi } from '../api/project'; 

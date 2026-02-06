@@ -71,6 +71,14 @@ export const projectApi = {
     return apiClient.post(`/project/${projectId}/component_visuals`, updateData);
   },
 
+  getVisualConfig(projectId) {
+    return apiClient.get(`/project/${projectId}/visual_config`);
+  },
+
+  saveVisualConfig(projectId, config) {
+    return apiClient.post(`/project/${projectId}/visual_config`, config);
+  },
+
   getSidebarConfig(projectId) {
     return apiClient.get(`/project/${projectId}/sidebar_config`);
   },

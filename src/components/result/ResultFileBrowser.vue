@@ -3,7 +3,6 @@
     <div class="file-list-header">
       <div class="col-name">FILENAME</div>
       <div class="col-size">SIZE</div>
-      <div class="col-action">ACTION</div>
     </div>
     
     <div class="file-list-body custom-scroll">
@@ -13,6 +12,8 @@
         :key="file.path" 
         :file="file" 
         :taskId="taskId" 
+        @select-file="handleSelectFile"
+        @open-hdf5="handleOpenHdf5"
       />
       
       <div v-if="files.length === 0" class="empty-files">
@@ -30,25 +31,10 @@ const props = defineProps({
   taskId: { type: String, required: true }
 });
 
-const BACKEND_URL = 'http://localhost:8000';
+const emit = defineEmits(['select-file', 'open-hdf5']);
 
-const getFileIcon = (type) => {
-  if (type === 'dir') return '📁';
-  return '📄';
-};
-
-const formatSize = (bytes) => {
-  if (bytes === 0) return '-';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-const getDownloadUrl = (filePath) => {
-  // GET /api/v1/tasks/{id}/files/download?path=...
-  return `${BACKEND_URL}/api/v1/tasks/${props.taskId}/files/download?path=${filePath}`;
-};
+const handleSelectFile = (file) => emit('select-file', file);
+const handleOpenHdf5 = (file) => emit('open-hdf5', file);
 </script>
 
 <style scoped>
@@ -81,18 +67,7 @@ const getDownloadUrl = (filePath) => {
 
 .col-size { width: 80px; text-align: right; color: #666; font-size: 11px; }
 
-.col-action { width: 60px; display: flex; justify-content: flex-end; }
-
-.download-btn {
-  background: rgba(0, 210, 255, 0.1);
-  color: #00d2ff;
-  border: 1px solid rgba(0, 210, 255, 0.2);
-  width: 24px; height: 24px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 4px; text-decoration: none;
-  transition: all 0.2s;
-}
-.download-btn:hover { background: #00d2ff; color: #000; }
+.col-action { width: 0; display: none; }
 
 .empty-files { padding: 40px; text-align: center; color: #444; font-size: 11px; letter-spacing: 1px; }
 

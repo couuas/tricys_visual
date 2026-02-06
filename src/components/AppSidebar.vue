@@ -25,24 +25,18 @@
         <span class="label-mini">MON</span>
       </div>
 
-      <div 
-        class="sidebar-item" 
-        :class="{ active: currentRouteName === 'result' }"
-        @click="navigateTo('result')"
-        title="Results"
-      >
-        <span class="icon">📊</span>
-        <span class="label-mini">RES</span>
-      </div>
+
+
+
 
       <div 
         class="sidebar-item" 
-        :class="{ active: currentRouteName === 'analysis' }"
-        @click="navigateTo('analysis')"
-        title="Analysis"
+        :class="{ active: currentRouteName === 'visualizer' }"
+        @click="navigateTo('visualizer')"
+        title="HDF5 Visualizer"
       >
-        <span class="icon">📈</span>
-        <span class="label-mini">ANA</span>
+        <span class="icon">🧭</span>
+        <span class="label-mini">VIS</span>
       </div>
     </div>
 

@@ -2,10 +2,10 @@
   <header class="top-bar">
     <!-- Left: Brand -->
     <div class="brand-area">
-      <div class="logo-mark">☢</div>
+      <div class="logo-mark">⚛</div>
       <div class="logo-type">
         TRICYS<span class="highlight">VIS</span>
-        <span class="platform-name">Visualization of Tritium Fuel Cycle Simulation</span>
+        <span class="platform-name">Visualization of TRitium Integrated CYcle Simulation</span>
       </div>
     </div>
 

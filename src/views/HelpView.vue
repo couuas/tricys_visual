@@ -6,7 +6,7 @@
     <div class="content">
       <div class="doc-container">
         <h1>TRICYS Help</h1>
-        <p>Welcome to the Tritium Cycle Simulation Platform.</p>
+        <p>Welcome to the TRitium Integrated CYcle Simulation.</p>
         <h3>Quick Start</h3>
         <ul>
           <li><strong>Config:</strong> Upload your Modelica files to start.</li>

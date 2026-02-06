@@ -19,17 +19,6 @@
       </div>
 
       <div class="form-group">
-        <label>Preset Style</label>
-        <div class="preset-grid">
-          <div class="preset-item" :class="{ active: localStyle.type === 'flow' }" @click="applyPreset('flow')"><span class="icon">🌊</span> Flow</div>
-          <div class="preset-item" :class="{ active: localStyle.type === 'solid' }" @click="applyPreset('solid')"><span class="icon">➖</span> Solid</div>
-          <div class="preset-item" :class="{ active: localStyle.type === 'dashed' }" @click="applyPreset('dashed')"><span class="icon">┄</span> Dash</div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="form-group">
         <label>Color</label>
         <div class="color-picker-wrapper">
           <input type="color" v-model="localStyle.color" class="color-input">
@@ -101,12 +90,6 @@ watch(selectedConnectionId, (newId) => {
   }
 });
 
-const applyPreset = (type) => {
-  localStyle.value.type = type;
-  if (type === 'flow') localStyle.value.speed = 1.0;
-  if (type === 'solid') localStyle.value.speed = 0;
-  if (type === 'dashed' && localStyle.value.speed === 0) localStyle.value.speed = 0.5;
-};
 
 // [新增]
 const handleClose = () => {
@@ -117,18 +100,18 @@ const handleClose = () => {
   }
 };
 
-const save = () => { if (selectedConnectionId.value) updateConnectionStyle(selectedConnectionId.value, localStyle.value); };
+const save = async () => { if (selectedConnectionId.value) await updateConnectionStyle(selectedConnectionId.value, localStyle.value); };
 // [修改] 同步样式逻辑
-const syncAll = async () => { 
+const syncAll = async () => {
   const isConfirmed = await $confirm(
     "This will overwrite the visual style of ALL connection lines in the system. Proceed?", 
     "SYNC STYLES"
   );
   
-  if (isConfirmed) { 
-    syncAllConnections(localStyle.value); 
-    save(); 
-  } 
+  if (isConfirmed) {
+    await syncAllConnections(localStyle.value);
+    await save();
+  }
 };</script>
 
 <style scoped>
@@ -217,11 +200,6 @@ h3 { margin: 0; color: #00d2ff; font-size: 16px; letter-spacing: 1px; }
 .divider { height: 1px; background: rgba(255,255,255,0.1); margin: 20px 0; }
 .form-group { margin-bottom: 15px; }
 label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
-.preset-grid { display: flex; gap: 8px; }
-.preset-item { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid transparent; border-radius: 6px; padding: 8px; text-align: center; cursor: pointer; font-size: 11px; color: #ccc; transition: 0.2s; }
-.preset-item:hover { background: rgba(255,255,255,0.1); }
-.preset-item.active { border-color: #00d2ff; color: #00d2ff; background: rgba(0, 210, 255, 0.1); }
-.icon { display: block; font-size: 16px; margin-bottom: 4px; }
 .color-picker-wrapper { display: flex; gap: 10px; align-items: center; }
 .color-input { width: 40px; height: 30px; border: none; padding: 0; background: none; cursor: pointer; }
 .hex-input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px; font-family: monospace; font-size: 12px; outline: none; }
