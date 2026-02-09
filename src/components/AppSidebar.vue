@@ -38,6 +38,16 @@
         <span class="icon">🧭</span>
         <span class="label-mini">VIS</span>
       </div>
+
+      <div 
+        class="sidebar-item" 
+        :class="{ active: currentRouteName === 'goview' }"
+        @click="navigateTo('goview')"
+        title="GoView"
+      >
+        <span class="icon">📊</span>
+        <span class="label-mini">GOV</span>
+      </div>
     </div>
 
     
