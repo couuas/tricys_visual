@@ -17,15 +17,15 @@
 </template>
 
 <script setup>
-import AppSidebar from '../components/AppSidebar.vue';
-import AppHeader from '../components/AppHeader.vue';
+import AppSidebar from '../components/layout/AppSidebar.vue';
+import AppHeader from '../components/layout/AppHeader.vue';
 </script>
 
 <style scoped>
 .workbench-layout {
   display: flex;
   flex-direction: column;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
   background: #05070a;
@@ -55,6 +55,17 @@ import AppHeader from '../components/AppHeader.vue';
   position: relative;
   display: flex;
   flex-direction: column;
+}
+
+.router-view-container :deep(> *) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.router-view-container :deep(> * > *) {
+  min-height: 0;
 }
 
 /* Page Transition */

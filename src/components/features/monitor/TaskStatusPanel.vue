@@ -132,7 +132,7 @@ watch(() => props.logs.length, () => {
   border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #30363d; padding-bottom: 10px; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #30363d; padding-bottom: 10px; flex-shrink: 0; }
 .header-left { display: flex; align-items: center; gap: 10px; }
 .panel-header h3 { margin: 0; font-size: 14px; letter-spacing: 1px; color: #fff; }
 
@@ -151,6 +151,7 @@ watch(() => props.logs.length, () => {
 .status-badge.pending { background: rgba(255, 255, 255, 0.1); color: #888; border: 1px solid #444; }
 
 .section-label { font-size: 10px; color: #666; font-weight: bold; margin-bottom: 8px; }
+.section { flex-shrink: 0; }
 
 /* Progress Bar */
 .progress-bar-track { 
@@ -177,10 +178,11 @@ watch(() => props.logs.length, () => {
 .metric-item .value { font-size: 16px; color: #fff; font-weight: bold; font-family: 'Consolas', monospace; }
 
 /* Logs */
-.log-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.log-section { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .log-window { 
   flex: 1; background: #05070a; border: 1px solid #30363d; border-radius: 4px; 
   padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; overflow-y: auto; 
+  min-height: 0;
 }
 .log-line { margin-bottom: 2px; text-shadow: none; display: flex; gap: 8px; }
 .log-line .ts { color: #444; white-space: nowrap; }
@@ -190,7 +192,7 @@ watch(() => props.logs.length, () => {
 .log-line.info .content { color: #88ceeb; }
 
 /* Controls */
-.control-actions { margin-top: auto; }
+.control-actions { margin-top: auto; flex-shrink: 0; }
 .stop-btn { 
   width: 100%; background: rgba(255, 82, 82, 0.1); border: 1px solid #ff5252; color: #ff5252;
   padding: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;

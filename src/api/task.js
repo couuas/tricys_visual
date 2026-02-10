@@ -7,9 +7,10 @@ export const taskApi = {
   },
 
   // List tasks
-  listTasks(status = null, limit = 20, offset = 0) {
+  listTasks(status = null, limit = 20, offset = 0, projectId = null) {
     const params = { limit, offset };
     if (status) params.status = status;
+    if (projectId) params.project_id = projectId;
     return apiClient.get('/tasks', { params });
   },
 

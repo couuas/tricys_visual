@@ -243,11 +243,11 @@ import { $confirm } from '../utils/dialog';
 import { $notify, $updateNotification, closeNotification } from '../utils/notification';
 import { taskApi } from '../api/task'; 
 
-import ThreeScene from '../components/ThreeScene.vue';
-import ComponentEditor from '../components/ComponentEditor.vue';
-import ConnectionEditor from '../components/ConnectionEditor.vue';
-import SimulationConfigModal from '../components/SimulationConfigModal.vue'; 
-import AnalysisConfigModal from '../components/AnalysisConfigModal.vue'; // [NEW]
+import ThreeScene from '../components/features/simulation/ThreeScene.vue';
+import ComponentEditor from '../components/features/simulation/ComponentEditor.vue';
+import ConnectionEditor from '../components/features/simulation/ConnectionEditor.vue';
+import SimulationConfigModal from '../components/features/simulation/SimulationConfigModal.vue'; 
+import AnalysisConfigModal from '../components/features/simulation/AnalysisConfigModal.vue'; // [NEW]
 
 const props = defineProps({ mode: { type: String, default: 'normal' } });
 const router = useRouter();
@@ -956,9 +956,6 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 .split-resizer:hover .resizer-handle { background: #00d2ff; }
 
 /* Common UI Elements */
-.bar-section { display: flex; align-items: center; height: 100%; }
-.bar-section.left { gap: 20px; }
-.bar-section.right { gap: 15px; }
 .brand-group { display: flex; align-items: center; gap: 10px; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 20px; }
 .logo-icon { font-size: 24px; color: #00d2ff; text-shadow: 0 0 10px rgba(0,210,255,0.6); }
 .logo-text { font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 1px; }

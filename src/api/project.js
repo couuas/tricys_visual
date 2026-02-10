@@ -157,5 +157,13 @@ export const projectApi = {
   // Fork/Clone a project
   forkProject(projectId) {
     return apiClient.post(`/project/${projectId}/fork`);
+  },
+
+  renameProject(projectId, name) {
+    return apiClient.patch(`/project/${projectId}`, { name });
+  },
+
+  checkConsistency(fix = false) {
+    return apiClient.get('/project/consistency', { params: { fix } });
   }
 };

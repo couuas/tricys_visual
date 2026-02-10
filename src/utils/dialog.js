@@ -1,5 +1,5 @@
 import { createVNode, render } from 'vue';
-import ConfirmDialog from '../components/ConfirmDialog.vue';
+import ConfirmDialog from '../components/common/ConfirmDialog.vue';
 
 // 创建挂载容器
 const container = document.createElement('div');
@@ -21,7 +21,7 @@ function createDialog({ type, title, message, confirmText, cancelText }) {
         resolve(result);
         // 稍后移除 DOM，保留动画时间
         setTimeout(() => {
-            render(null, container);
+          render(null, container);
         }, 500);
       },
       reject
@@ -33,7 +33,7 @@ function createDialog({ type, title, message, confirmText, cancelText }) {
     // 3. 触发组件内部的 show 方法以显示动画
     // 需要在 nextTick 或者渲染完成后调用，这里简单地通过组件 expose 的 show
     if (vnode.component && vnode.component.exposed) {
-        vnode.component.exposed.show();
+      vnode.component.exposed.show();
     }
   });
 }

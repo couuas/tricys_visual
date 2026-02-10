@@ -1,11 +1,7 @@
-import { ref, computed } from 'vue';
 import { userApi } from '../api/user';
 import { authApi } from '../api/auth';
+import { currentUser, isAuthenticated, setCurrentUser, clearAuth } from './authState';
 
-
-// Global State
-const currentUser = ref(null);
-const isAuthenticated = computed(() => !!currentUser.value);
 
 export function useAuth() {
 
@@ -17,12 +13,12 @@ export function useAuth() {
                 // Verify token validity by fetching current user
                 const user = await userApi.getCurrentUser();
                 if (user) {
-                    currentUser.value = user;
+                    setCurrentUser(user);
                     return true;
                 }
             } catch (e) {
                 console.warn("Auth restoration failed", e);
-                logout();
+                clearAuth();
             }
         }
         return false;
@@ -40,7 +36,7 @@ export function useAuth() {
                 // 3. Fetch User Profile using /me endpoint
                 const user = await userApi.getCurrentUser();
 
-                currentUser.value = user;
+                setCurrentUser(user);
 
                 return { success: true, user };
             } else {
@@ -83,14 +79,7 @@ export function useAuth() {
 
     // Logout
     const logout = () => {
-        currentUser.value = null;
-
-        // Iterate over all keys in localStorage and remove those that start with 'tricys_'
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('tricys_')) {
-                localStorage.removeItem(key);
-            }
-        });
+        clearAuth();
     };
 
     return {

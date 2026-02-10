@@ -188,10 +188,10 @@
 
 <script setup>
 import { ref, watch, onMounted, computed, onUnmounted } from 'vue';
-import { useSimulation } from '../composables/useSimulation';
-import { useAuth } from '../composables/useAuth';
-import { $confirm } from '../utils/dialog';
-import { $notify } from '../utils/notification'; 
+import { useSimulation } from '../../../composables/useSimulation';
+import { useAuth } from '../../../composables/useAuth';
+import { $confirm } from '../../../utils/dialog';
+import { $notify } from '../../../utils/notification'; 
 
 const props = defineProps(['selectedId', 'embedded', 'allowClose']);
 const emit = defineEmits(['close', 'update', 'close-panel']);
@@ -204,8 +204,8 @@ const {
   isGroup, isExpanded, setExpandedGroup, dissolveGroup, componentGroups, isReadOnly
 } = useSimulation();
 
-import { projectApi } from '../api/project';
-import { libraryApi } from '../api/library';
+import { projectApi } from '../../../api/project';
+import { libraryApi } from '../../../api/library';
 
 const { currentUser } = useAuth();
 const isSuperUser = computed(() => currentUser.value && currentUser.value.is_superuser);

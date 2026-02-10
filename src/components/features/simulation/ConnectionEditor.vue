@@ -59,8 +59,8 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { useSimulation } from '../composables/useSimulation';
-import { $confirm } from '../utils/dialog';
+import { useSimulation } from '../../../composables/useSimulation';
+import { $confirm } from '../../../utils/dialog';
 
 // [修改] 新增 allowClose prop
 const props = defineProps({ 

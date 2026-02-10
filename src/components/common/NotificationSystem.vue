@@ -27,7 +27,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { notificationState, closeNotification } from '../utils/notification';
+import { notificationState, closeNotification } from '../../utils/notification';
 
 const items = computed(() => notificationState.items);
 

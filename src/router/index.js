@@ -53,12 +53,7 @@ const router = createRouter({
           props: true,
           meta: { requiresAuth: true }
         },
-        {
-          path: 'visualizer',
-          name: 'visualizer',
-          component: () => import('../views/VisualizerView.vue'),
-          meta: { requiresAuth: true }
-        },
+
         {
           path: 'goview',
           name: 'goview',
@@ -74,8 +69,23 @@ const router = createRouter({
     },
 
     // Legacy Redirects
-    { path: '/vis', redirect: '/config' },
+    { path: '/vis', redirect: '/monitor' },
   ]
+});
+
+window.addEventListener('tricys-auth-expired', (event) => {
+  const reason = event?.detail?.reason || 'expired';
+  $notify({
+    title: 'SESSION EXPIRED',
+    message: reason === 'token overdue'
+      ? 'Your session has expired. Please log in again.'
+      : 'Authentication required. Please log in again.',
+    type: 'warning'
+  });
+
+  if (router.currentRoute.value?.name !== 'user') {
+    router.replace({ name: 'user' });
+  }
 });
 
 // Guard: Check Authentication
@@ -110,7 +120,7 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // Project Context Guard
-    const projectPages = ['config', 'monitor', 'visualizer', 'component-detail', 'goview'];
+    const projectPages = ['config', 'monitor', 'component-detail', 'goview'];
 
     // Demo mode exception: 'config' route is used for demo but with separate name/path logic? 
     // Actually 'demo' route has name='demo'. 'config' route has name='config'. 

@@ -29,15 +29,7 @@
 
 
 
-      <div 
-        class="sidebar-item" 
-        :class="{ active: currentRouteName === 'visualizer' }"
-        @click="navigateTo('visualizer')"
-        title="HDF5 Visualizer"
-      >
-        <span class="icon">🧭</span>
-        <span class="label-mini">VIS</span>
-      </div>
+
 
       <div 
         class="sidebar-item" 
@@ -88,7 +80,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAuth } from '../composables/useAuth';
+import { useAuth } from '../../composables/useAuth';
 
 const route = useRoute();
 const router = useRouter();

@@ -130,8 +130,17 @@
                  <div v-if="viewMode === 'personal'" class="project-list custom-scroll">
                     <div v-for="p in recentProjects" :key="p.id" class="project-row" @click="selectProject(p)">
                        <div class="row-icon">❖</div>
-                       <div class="p-info">
-                          <div class="p-name">{{ p.name || 'Untitled Project' }}</div>
+                              <div class="p-info">
+                                  <div v-if="editingProjectId === (p.id || p.project_id)" class="p-name-edit">
+                                      <input
+                                         v-model="editingName"
+                                         class="p-name-input"
+                                         type="text"
+                                         @keyup.enter="commitRename(p)"
+                                         @keyup.esc="cancelRename"
+                                      />
+                                  </div>
+                                  <div v-else class="p-name">{{ p.name || 'Untitled Project' }}</div>
                           <div class="p-meta">
                              <span class="meta-tag">ID: {{ (p.id || '').slice(0,8) }}</span>
                              <span class="meta-dot">&bull;</span>
@@ -139,6 +148,13 @@
                           </div>
                        </div>
                        <div class="p-actions">
+                                  <template v-if="editingProjectId === (p.id || p.project_id)">
+                                     <button class="btn-rename" @click.stop="commitRename(p)" :disabled="isAnyProcessing" title="Save Name">SAVE</button>
+                                     <button class="btn-rename cancel" @click.stop="cancelRename" :disabled="isAnyProcessing" title="Cancel">CANCEL</button>
+                                  </template>
+                                  <template v-else>
+                                     <button class="btn-rename" @click.stop="startRename(p)" :disabled="isAnyProcessing" title="Rename Project">RENAME</button>
+                                  </template>
                           <button class="btn-export" @click.stop="handleExport(p)" title="Export Project Package">EXPORT</button>
                           <button class="btn-del" @click.stop="deleteProject(p.id)" title="Delete Project">✕</button>
                        </div>
@@ -175,6 +191,9 @@
                 <p>Select a project to continue or initiate a new simulation topology.</p>
              </div>
              <div class="w-actions">
+                     <button class="btn-consistency" @click="handleConsistencyFix" :disabled="isConsistencyRunning">
+                         {{ isConsistencyRunning ? 'FIXING...' : 'FIX MY CONSISTENCY' }}
+                     </button>
                 <button class="btn-logout-alt" @click="handleLogout">SIGN OUT Session</button>
              </div>
           </div>
@@ -210,6 +229,7 @@ const userInitials = computed(() => {
     const name = currentUser.value.full_name || currentUser.value.username;
     return name.slice(0, 2).toUpperCase();
 });
+
 
 const handleLogin = async () => {
     if (!loginForm.username || !loginForm.password) { errorMsg.value = "Credentials required"; return; }
@@ -258,8 +278,11 @@ const publicProjects = ref([]);
 const viewMode = ref('personal'); // 'personal' or 'public'
 const isProcessing = reactive({ model: false, project: false });
 const isAnyProcessing = computed(() => isProcessing.model || isProcessing.project);
+const isConsistencyRunning = ref(false);
 
 const lastProjectId = ref(localStorage.getItem('tricys_last_pid'));
+const editingProjectId = ref(null);
+const editingName = ref('');
 
 const loadProjects = async () => {
     if (!isAuthenticated.value) return;
@@ -311,6 +334,10 @@ const deleteProject = async (id) => {
     if (!confirm("Permanently delete this project?")) return;
     try {
         await projectApi.deleteProject(id);
+        if (lastProjectId.value === id) {
+            localStorage.removeItem('tricys_last_pid');
+            lastProjectId.value = null;
+        }
         $notify({ title: 'DELETED', message: 'Project removed.', type: 'success' });
         loadProjects();
     } catch (e) {
@@ -338,6 +365,66 @@ const handleExport = async (project) => {
         $notify({ title: 'EXPORT SUCCESS', message: 'Project archive downloaded.', type: 'success' });
     } catch (e) {
         $notify({ title: 'EXPORT FAILED', message: 'Could not generate archive.', type: 'error' });
+    } finally {
+        isProcessing.project = false;
+    }
+};
+
+const handleConsistencyFix = async () => {
+    if (isConsistencyRunning.value) return;
+    isConsistencyRunning.value = true;
+    try {
+        const res = await projectApi.checkConsistency(true);
+        const fixed = Array.isArray(res?.fixed) ? res.fixed.length : 0;
+        const missing = Array.isArray(res?.missing_goview) ? res.missing_goview.length : 0;
+        const orphan = Array.isArray(res?.orphan_goview) ? res.orphan_goview.length : 0;
+        $notify({
+            title: 'CONSISTENCY CHECK',
+            message: `Fixed ${fixed}. Missing ${missing}. Orphan ${orphan}.`,
+            type: 'success'
+        });
+    } catch (e) {
+        $notify({ title: 'CONSISTENCY FAILED', message: 'Could not fix consistency.', type: 'error' });
+    } finally {
+        isConsistencyRunning.value = false;
+    }
+};
+
+const startRename = (project) => {
+    const pid = project.id || project.project_id;
+    if (!pid || isAnyProcessing.value) return;
+    editingProjectId.value = pid;
+    editingName.value = project.name || 'Untitled Project';
+};
+
+const cancelRename = () => {
+    editingProjectId.value = null;
+    editingName.value = '';
+};
+
+const commitRename = async (project) => {
+    const pid = project.id || project.project_id;
+    if (!pid || isAnyProcessing.value) return;
+
+    const currentName = project.name || 'Untitled Project';
+    const name = String(editingName.value || '').trim();
+    if (!name) {
+        $notify({ title: 'RENAME FAILED', message: 'Name cannot be empty.', type: 'error' });
+        return;
+    }
+    if (name === currentName) {
+        cancelRename();
+        return;
+    }
+
+    isProcessing.project = true;
+    try {
+        const res = await projectApi.renameProject(pid, name);
+        project.name = res?.name || name;
+        $notify({ title: 'RENAMED', message: 'Project name updated.', type: 'success' });
+        cancelRename();
+    } catch (e) {
+        $notify({ title: 'RENAME FAILED', message: 'Could not update project name.', type: 'error' });
     } finally {
         isProcessing.project = false;
     }
@@ -406,7 +493,7 @@ watch(isAuthenticated, (newVal) => {
 
 <style scoped>
 .user-view { width: 100%; height: 100%; background: #05070a; color: #fff; display: flex; flex-direction: column; font-family: 'Inter', sans-serif; overflow: hidden; }
-.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: radial-gradient(circle at center, #0d1117 0%, #05070a 70%); }
+.content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; background: radial-gradient(circle at center, #0d1117 0%, #05070a 70%); }
 
 /* --- Auth Styles --- */
 .auth-container { width: 380px; margin: auto; background: rgba(13, 17, 23, 0.9); border: 1px solid #30363d; border-radius: 8px; backdrop-filter: blur(10px); padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
@@ -429,17 +516,77 @@ watch(isAuthenticated, (newVal) => {
 .error-msg { font-size: 11px; color: #ff5252; text-align: center; margin: 0; }
 
 /* --- Dashboard Styles --- */
-.project-dashboard { width: 100%; height: 100%; background: #0d1117; display: flex; flex-direction: column; overflow: hidden; }
-.welcome-header { padding: 30px 40px; border-bottom: 1px solid #1c2128; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to right, #0d1117, #0b0e14); }
+/* --- Dashboard Styles --- */
+.project-dashboard { 
+    width: 100%; height: 100%; min-height: 800px; 
+    background: #0d1117; 
+    display: flex; flex-direction: column; 
+    overflow: visible; 
+}
+
+.welcome-header { 
+    height: 120px; flex-shrink: 0;
+    padding: 0 40px; 
+    border-top: 1px solid #30363d; 
+    display: flex; justify-content: space-between; align-items: center; 
+    background: #0b0e14; /* solid background to cover scrolling content if any */
+    z-index: 10; /* Ensure it stays on top visually if overlap happens */
+}
+.welcome-header.bottom-panel { order: 2; }
+
 .w-text h2 { margin: 0; font-size: 20px; color: #fff; letter-spacing: 1px; }
 .w-text p { margin: 5px 0 0 0; font-size: 13px; color: #666; }
-.btn-logout-alt { background: transparent; border: 1px solid #30363d; color: #888; padding: 10px 20px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-.btn-logout-alt:hover { border-color: #ff5252; color: #ff5252; background: rgba(255, 82, 82, 0.05); }
 
-.project-dashboard { display: flex; flex-direction: column; height: 100%; }
-.welcome-header { height: 120px; border-top: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; background: #0b0e14; flex-shrink: 0; }
-.welcome-header.bottom-panel { order: 2; }
-.dashboard-main { flex: 1; display: flex; overflow: hidden; order: 1; }
+.btn-logout-alt {
+    background: transparent;
+    border: 1px solid #30363d;
+    color: #888;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-logout-alt:hover {
+    border-color: #00d2ff;
+    color: #00d2ff;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+}
+
+.btn-consistency {
+    background: rgba(255, 170, 0, 0.08);
+    border: 1px solid rgba(255, 170, 0, 0.5);
+    color: #ffaa00;
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+    margin-right: 10px;
+}
+
+.btn-consistency:hover:not(:disabled) {
+    border-color: #ffaa00;
+    color: #000;
+    background: #ffaa00;
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
+}
+
+.btn-consistency:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.dashboard-main { 
+    flex: 1; 
+    display: flex; 
+    overflow: hidden; 
+    order: 1; 
+    min-height: 0; /* Important for nested flex scroll */
+}
 
 /* Create Section */
 .section-create { flex: 1; padding: 30px; border-right: 1px solid #30363d; background: linear-gradient(135deg, rgba(0,0,0,0.2), transparent); }
@@ -487,6 +634,9 @@ watch(isAuthenticated, (newVal) => {
 .p-info { flex: 1; min-width: 0; }
 .p-name { font-weight: bold; color: #eee; font-size: 13px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Inter', sans-serif; letter-spacing: 0.5px; }
 .project-row:hover .p-name { color: #fff; text-shadow: 0 0 10px rgba(0,210,255,0.5); }
+.p-name-edit { margin-bottom: 4px; }
+.p-name-input { width: 100%; background: #05070a; border: 1px solid #00d2ff; color: #fff; padding: 6px 8px; border-radius: 4px; font-size: 12px; font-family: 'Inter', sans-serif; }
+.p-name-input:focus { outline: none; box-shadow: 0 0 8px rgba(0, 210, 255, 0.35); }
 
 .p-meta { font-size: 10px; color: #666; font-family: monospace; display: flex; align-items: center; gap: 6px; }
 .meta-tag { background: #1c2128; padding: 2px 5px; border-radius: 3px; color: #8b949e; }
@@ -495,6 +645,11 @@ watch(isAuthenticated, (newVal) => {
 .p-actions { display: flex; align-items: center; gap: 8px; }
 .btn-export { background: rgba(0, 255, 136, 0.1); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); padding: 4px 8px; font-size: 9px; cursor: pointer; border-radius: 4px; transition: 0.2s; font-weight: bold; }
 .btn-export:hover { background: #00ff88; color: #000; border-color: #00ff88; box-shadow: 0 0 10px rgba(0, 255, 136, 0.4); }
+.btn-rename { background: rgba(0, 210, 255, 0.08); color: #00d2ff; border: 1px solid rgba(0, 210, 255, 0.4); padding: 4px 8px; font-size: 9px; cursor: pointer; border-radius: 4px; transition: 0.2s; font-weight: bold; }
+.btn-rename:hover:not(:disabled) { background: #00d2ff; color: #000; border-color: #00d2ff; box-shadow: 0 0 10px rgba(0, 210, 255, 0.35); }
+.btn-rename:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-rename.cancel { background: rgba(255, 82, 82, 0.08); color: #ff5252; border-color: rgba(255, 82, 82, 0.4); }
+.btn-rename.cancel:hover:not(:disabled) { background: #ff5252; color: #000; border-color: #ff5252; box-shadow: 0 0 10px rgba(255, 82, 82, 0.35); }
 .btn-del { width: 24px; height: 24px; border: 1px solid transparent; background: transparent; color: #484f58; cursor: pointer; font-size: 14px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .btn-del:hover { background: rgba(255, 82, 82, 0.1); border-color: rgba(255, 82, 82, 0.3); color: #ff5252; }
 .empty-list { text-align: center; color: #444; font-size: 12px; padding: 30px; border: 1px dashed #30363d; border-radius: 6px; background: rgba(255,255,255,0.01); }

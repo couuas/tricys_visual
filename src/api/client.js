@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { triggerAuthExpired } from '../utils/authEvents';
 
 // Create a configured axios instance
 // Basic configuration assuming backend is on localhost:8000 by default if no env var
@@ -29,6 +30,10 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      triggerAuthExpired('unauthorized');
+    }
     console.error('API Error:', error.response || error.message);
     return Promise.reject(error);
   }
