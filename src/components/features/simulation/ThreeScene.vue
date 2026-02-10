@@ -97,7 +97,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { useSimulation } from '../composables/useSimulation';
+import { useSimulation } from '../../../composables/useSimulation';
 import { useRouter } from 'vue-router';
 
 const emit = defineEmits(['selectComponent', 'groupContext']);

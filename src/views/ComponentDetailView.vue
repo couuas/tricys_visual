@@ -28,10 +28,6 @@
               <button class="hud-btn" @click="addWidget('code')"><span class="icon">📝</span> Code</button>
               <button class="hud-btn" @click="addWidget('model')"><span class="icon">🧊</span> Model</button>
               <button class="hud-btn" @click="addWidget('media')"><span class="icon">🖼️</span> Media</button>
-              <div class="separator"></div>
-              <button class="hud-btn primary" @click="saveLayout">
-                <span class="icon">💾</span> <span class="btn-text">SAVE</span>
-              </button>
             </div>
           </transition>
 
@@ -144,7 +140,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { GridLayout, GridItem } from 'vue3-grid-layout-next';
 import { v4 as uuidv4 } from 'uuid';
 import { marked } from 'marked'; 
-import Mini3DViewer from '../components/Mini3DViewer.vue';
+import Mini3DViewer from '../components/features/simulation/Mini3DViewer.vue';
 import { useSimulation } from '../composables/useSimulation';
 import { $confirm } from '../utils/dialog';
 import { $notify } from '../utils/notification'; 
@@ -194,9 +190,8 @@ onMounted(async () => {
 const toggleEditMode = () => {
   isEditMode.value = !isEditMode.value;
   if (!isEditMode.value) {
-      // Optional: Auto-save when exiting edit mode?
-      // saveLayout(); 
-      $notify({ title: 'VIEW MODE', message: 'Layout locked.', type: 'info', duration: 2000 });
+      saveLayout();
+      $notify({ title: 'VIEW MODE', message: 'Layout saved and locked.', type: 'info', duration: 2000 });
   } else {
       $notify({ title: 'EDIT MODE', message: 'Layout unlocked. You can now rearrange cards.', type: 'warning', duration: 2000 });
   }
@@ -393,13 +388,13 @@ const formatValue = (val) => {
 
 <style scoped>
 /* Base Styles */
-.detail-view { width: 100%; height: 100%; background: #05070a; display: flex; flex-direction: column; color: #eee; overflow: hidden; transition: background 0.3s; font-family: 'Inter', sans-serif; }
+.detail-view { width: 100%; height: 100%; flex: 1; min-height: 0; background: #05070a; display: flex; flex-direction: column; color: #eee; overflow: hidden; transition: background 0.3s; font-family: 'Inter', sans-serif; }
 
 /* Top Bar */
 .top-bar { 
-  flex: 0 0 65px; z-index: 500; 
+  flex: 0 0 52px; z-index: 500; 
   display: flex; align-items: center; justify-content: space-between; 
-  padding: 0 20px; box-sizing: border-box; background: rgba(16, 20, 28, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0, 210, 255, 0.15); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); 
+  padding: 0 16px; box-sizing: border-box; background: rgba(16, 20, 28, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0, 210, 255, 0.15); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); 
 }
 .top-bar::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(0,210,255,0.5) 50%, transparent 100%); box-shadow: 0 0 8px rgba(0, 210, 255, 0.4); }
 
@@ -407,7 +402,7 @@ const formatValue = (val) => {
 .bar-section.left { gap: 20px; }
 .bar-section.right { gap: 15px; }
 
-.brand-group { display: flex; align-items: center; gap: 10px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 20px; }
+.brand-group { display: flex; align-items: center; gap: 10px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 16px; }
 .logo-icon { font-size: 24px; color: #00d2ff; text-shadow: 0 0 10px rgba(0,210,255,0.6); }
 .logo-text { font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 1px; }
 .logo-text .version { font-size: 10px; color: #666; font-weight: normal; margin-left: 5px; vertical-align: top; }
@@ -427,7 +422,7 @@ const formatValue = (val) => {
 .nav-btn.back:hover { color: #fff; }
 
 /* Grid & Cards */
-.grid-container { flex: 1; overflow-y: auto; position: relative; background-image: radial-gradient(#21262d 1px, transparent 1px); background-size: 20px 20px; padding: 20px; transition: padding 0.3s; }
+.grid-container { flex: 1; min-height: 0; overflow-y: auto; position: relative; background-image: radial-gradient(#21262d 1px, transparent 1px); background-size: 20px 20px; padding: 20px; transition: padding 0.3s; }
 
 .grid-card { 
   background: #161b22; 

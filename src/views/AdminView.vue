@@ -53,51 +53,63 @@
         
         <!-- DASHBOARD VIEW -->
         <div v-if="currentTab === 'dashboard'" class="dashboard-grid">
-             <!-- KPI Cards -->
-             <div class="kpi-card">
-               <div class="kpi-header">
-                 <span class="kpi-title">CPU Load</span>
-                 <span class="kpi-icon orange">⚡</span>
-               </div>
-               <div class="kpi-value" :class="{ 'text-danger': (systemStats?.cpu || 0) > 80 }">
-                 {{ systemStats?.cpu || 0 }}<span class="unit">%</span>
-               </div>
-               <div class="progress-track">
-                  <div class="progress-fill orange" :style="{ width: (systemStats?.cpu || 0) + '%' }"></div>
-               </div>
+             <!-- KPI Cards (Top Row) -->
+             <div class="dash-row">
+                 <div class="kpi-card">
+                   <div class="kpi-header">
+                     <span class="kpi-title">Total Users</span>
+                     <span class="kpi-icon blue">👥</span>
+                   </div>
+                   <div class="kpi-value">{{ systemStats?.stats?.users?.total || 0 }}</div>
+                   <div class="kpi-sub">Active: {{ systemStats?.stats?.users?.active || 0 }}</div>
+                 </div>
+
+                 <div class="kpi-card">
+                   <div class="kpi-header">
+                     <span class="kpi-title">Total Projects</span>
+                     <span class="kpi-icon orange">📂</span>
+                   </div>
+                   <div class="kpi-value">{{ systemStats?.stats?.projects?.total || 0 }}</div>
+                   <div class="kpi-sub">Public: {{ systemStats?.stats?.projects?.public || 0 }}</div>
+                 </div>
+
+                 <div class="kpi-card">
+                   <div class="kpi-header">
+                     <span class="kpi-title">GoView Screens</span>
+                     <span class="kpi-icon purple">📈</span>
+                   </div>
+                   <div class="kpi-value">{{ systemStats?.stats?.goview?.total || 0 }}</div>
+                   <div class="kpi-sub">Published: {{ systemStats?.stats?.goview?.published || 0 }}</div>
+                 </div>
+
+                 <div class="kpi-card">
+                   <div class="kpi-header">
+                     <span class="kpi-title">Active Processes</span>
+                     <span class="kpi-icon green">⚙</span>
+                   </div>
+                   <div class="kpi-value">{{ systemStats?.processes || 0 }}</div>
+                   <div class="kpi-sub">System Threads</div>
+                 </div>
              </div>
 
-             <div class="kpi-card">
-               <div class="kpi-header">
-                 <span class="kpi-title">Memory Usage</span>
-                 <span class="kpi-icon blue">🧠</span>
-               </div>
-               <div class="kpi-value">
-                 {{ systemStats?.memory?.percent || 0 }}<span class="unit">%</span>
-               </div>
-               <div class="progress-track">
-                  <div class="progress-fill blue" :style="{ width: (systemStats?.memory?.percent || 0) + '%' }"></div>
-               </div>
-             </div>
-
-             <div class="kpi-card">
-               <div class="kpi-header">
-                 <span class="kpi-title">Active Processes</span>
-                 <span class="kpi-icon purple">⚙</span>
-               </div>
-               <div class="kpi-value">{{ systemStats?.processes || 0 }}</div>
-               <div class="kpi-sub">Threads Active</div>
-             </div>
-
-             <div class="kpi-card">
-               <div class="kpi-header">
-                 <span class="kpi-title">Workspace Storage</span>
-                 <span class="kpi-icon green">💾</span>
-               </div>
-               <div class="kpi-value">{{ systemStats?.disk?.percent || 0 }}<span class="unit">%</span></div>
-               <div class="progress-track">
-                  <div class="progress-fill green" :style="{ width: (systemStats?.disk?.percent || 0) + '%' }"></div>
-               </div>
+             <!-- Charts Area (2x2 Grid) -->
+             <div class="chart-container full-width">
+                <div class="chart-card">
+                    <div class="chart-header">User & Role Distribution</div>
+                    <div ref="userChartRef" class="chart-body"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">Project Overview</div>
+                    <div ref="projectChartRef" class="chart-body"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">GoView Deployment</div>
+                    <div ref="goviewChartRef" class="chart-body"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">System Resource Monitor</div>
+                    <div ref="resourceChartRef" class="chart-body"></div>
+                </div>
              </div>
         </div>
 
@@ -166,9 +178,53 @@
                    <span v-else class="badge dark">Private</span>
                  </td>
                  <td class="text-right actions-group">
-                    <button v-if="!p.is_public" class="btn-xs outline" @click="togglePublish(p, true)">Publish</button>
-                    <button v-else class="btn-xs outline warning" @click="togglePublish(p, false)">Unpublish</button>
+                    <button v-if="!p.is_public" class="btn-xs outline" @click="togglePublish(p, true)">Archive</button>
+                    <button v-else class="btn-xs outline warning" @click="togglePublish(p, false)">Restore</button>
                     <button class="icon-action danger" @click="deleteProject(p)">🗑</button>
+                 </td>
+               </tr>
+             </tbody>
+           </table>
+        </div>
+
+        <!-- GOVIEW TABLE -->
+        <div v-if="currentTab === 'goview'" class="table-container">
+           <table class="bi-table">
+             <thead>
+               <tr>
+                 <th>GoView Project</th>
+                 <th>Creator ID</th>
+                 <th>State</th>
+                 <th>Last Updated</th>
+                 <th class="text-right">Actions</th>
+               </tr>
+             </thead>
+             <tbody>
+               <tr v-for="g in goviewList" :key="g.id">
+                 <td>
+                   <div class="project-cell">
+                     <div class="preview-thumb" v-if="g.index_image">
+                        <img :src="g.index_image" alt="preview" />
+                     </div>
+                     <span class="p-icon" v-else>📊</span>
+                     <div class="user-info">
+                        <span class="p-name">{{ g.project_name }}</span>
+                        <span class="u-id">{{ g.id }}</span>
+                     </div>
+                   </div>
+                 </td>
+                 <td class="mono-text">{{ g.create_user_id ? g.create_user_id.slice(0,8) + '...' : 'Unknown' }}</td>
+                 <td>
+                   <span v-if="g.state === 1" class="badge blue">Published</span>
+                   <span v-else-if="g.state === -1" class="badge gray">Draft</span>
+                   <span v-else class="badge dark">Unknown</span>
+                   <span v-if="g.is_delete" class="badge danger" style="margin-left:5px">Deleted</span>
+                 </td>
+                 <td class="mono-text">{{ new Date(g.update_time).toLocaleString() }}</td>
+                 <td class="text-right actions-group">
+                     <button v-if="!g.is_delete" class="btn-xs outline" @click="copyLink(g)">Copy URL</button>
+                    <a v-if="!g.is_delete" :href="`/goview/#/chart/preview/${g.id}`" target="_blank" class="btn-xs outline">Open</a>
+                    <button v-if="!g.is_delete" class="icon-action danger" @click="deleteGoviewProject(g)" title="Delete Project">🗑</button>
                  </td>
                </tr>
              </tbody>
@@ -233,8 +289,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import * as echarts from 'echarts';
 import { useAuth } from '../composables/useAuth';
 import { $notify } from '../utils/notification';
 import apiClient from '../api/client';
@@ -247,6 +304,7 @@ const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'users', label: 'Users', icon: '👥' },
   { id: 'projects', label: 'Projects', icon: '📂' },
+  { id: 'goview', label: 'GoView', icon: '📈' },
   { id: 'assets', label: 'Assets', icon: '🧩' },
   { id: 'logs', label: 'System Logs', icon: '📝' },
 ];
@@ -260,11 +318,19 @@ const currentTabLabel = computed(() => {
 const systemStats = ref({});
 const usersList = ref([]);
 const projectsList = ref([]);
+const goviewList = ref([]);
 const assetModels = ref([]);
 const systemLogs = ref('');
 const logContainer = ref(null);
 const assetInput = ref(null);
 const templateInput = ref(null);
+
+// Chart Refs
+const userChartRef = ref(null);
+const projectChartRef = ref(null);
+const goviewChartRef = ref(null);
+const resourceChartRef = ref(null);
+let charts = {};
 
 let statsInterval = null;
 let logsInterval = null;
@@ -272,10 +338,132 @@ let logsInterval = null;
 // Actions
 const exitAdmin = () => router.push({ name: 'home' });
 
+// Init Charts
+const initCharts = () => {
+    if(!userChartRef.value) return;
+
+    // 1. User Chart
+    charts.user = echarts.init(userChartRef.value);
+    // 2. Project Chart
+    charts.project = echarts.init(projectChartRef.value);
+    // 3. GoView Chart
+    charts.goview = echarts.init(goviewChartRef.value);
+    // 4. Resource Chart
+    charts.resource = echarts.init(resourceChartRef.value);
+
+    updateCharts();
+    window.addEventListener('resize', resizeCharts);
+};
+
+const resizeCharts = () => {
+    Object.values(charts).forEach(c => c.resize());
+};
+
+const updateCharts = () => {
+    if(!systemStats.value.stats) return;
+    const s = systemStats.value.stats;
+
+    // User Pie
+    charts.user.setOption({
+        tooltip: { trigger: 'item' },
+        legend: { bottom: '5%', left: 'center', textStyle: { color: '#ccc' } },
+        series: [{
+            name: 'Users',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: false,
+            itemStyle: { borderRadius: 10, borderColor: '#0d1117', borderWidth: 2 },
+            label: { show: false, position: 'center' },
+            emphasis: { label: { show: true, fontSize: 20, fontWeight: 'bold' } },
+            data: [
+                { value: s.users.admin, name: 'Admin', itemStyle: { color: '#a855f7' } },
+                { value: s.users.operator, name: 'Operator', itemStyle: { color: '#00d2ff' } },
+                { value: s.users.total - s.users.active, name: 'Inactive', itemStyle: { color: '#30363d' } }
+            ]
+        }],
+        backgroundColor: 'transparent'
+    });
+
+    // Project Bar
+    charts.project.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: [{ type: 'category', data: ['Public', 'Private'], axisLabel: { color: '#ccc' } }],
+        yAxis: [{ type: 'value', axisLabel: { color: '#ccc' }, splitLine: { lineStyle: { color: '#30363d' } } }],
+        series: [{
+            name: 'Projects',
+            type: 'bar',
+            barWidth: '60%',
+            data: [
+                { value: s.projects.public, itemStyle: { color: '#00d2ff' } },
+                { value: s.projects.private, itemStyle: { color: '#238636' } }
+            ]
+        }],
+        backgroundColor: 'transparent'
+    });
+
+    // GoView Donut
+    charts.goview.setOption({
+         tooltip: { trigger: 'item' },
+         legend: { bottom: '5%', left: 'center', textStyle: { color: '#ccc' } },
+         series: [{
+             name: 'GoView',
+             type: 'pie',
+             radius: ['50%', '70%'],
+             avoidLabelOverlap: false,
+             label: { show: false },
+             data: [
+                 { value: s.goview.published, name: 'Published', itemStyle: { color: '#00d2ff' } },
+                 { value: s.goview.draft, name: 'Draft', itemStyle: { color: '#888' } }
+             ]
+         }],
+         backgroundColor: 'transparent'
+    });
+
+    // Resource Line (Mock History for now, or just current gauge)
+    const cpu = systemStats.value.cpu || 0;
+    const mem = systemStats.value.memory?.percent || 0;
+    const now = new Date().toLocaleTimeString();
+
+    // Ideally we keep a history array, but for simplicity let's use a Gauge for now
+    charts.resource.setOption({
+        tooltip: { formatter: '{a} <br/>{b} : {c}%' },
+        series: [
+            {
+                name: 'CPU',
+                type: 'gauge',
+                center: ['25%', '50%'],
+                radius: '90%',
+                progress: { show: true },
+                detail: { valueAnimation: true, formatter: '{value}', fontSize: 14, color: '#fff' },
+                data: [{ value: cpu, name: 'CPU', itemStyle: { color: '#ff9900' } }],
+                axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false }
+            },
+            {
+                name: 'Memory',
+                type: 'gauge',
+                center: ['75%', '50%'],
+                radius: '90%',
+                progress: { show: true },
+                detail: { valueAnimation: true, formatter: '{value}', fontSize: 14, color: '#fff' },
+                data: [{ value: mem, name: 'RAM', itemStyle: { color: '#00d2ff' } }],
+                axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false }
+            }
+        ],
+        backgroundColor: 'transparent'
+    });
+};
+
 // Fetch Data
-const fetchStats = async () => { try { systemStats.value = await apiClient.get('/admin/system/stats'); } catch(e) {} };
+const fetchStats = async () => { 
+    try { 
+        systemStats.value = await apiClient.get('/admin/system/stats'); 
+        if(currentTab.value === 'dashboard' && charts.user) updateCharts();
+    } catch(e) {} 
+};
 const fetchUsers = async () => { try { usersList.value = await apiClient.get('/admin/users'); } catch(e) {} };
 const fetchProjects = async () => { try { projectsList.value = await apiClient.get('/admin/projects'); } catch(e) {} };
+const fetchGoviewProjects = async () => { try { goviewList.value = await apiClient.get('/admin/goview/projects'); } catch(e) {} };
 const fetchAssets = async () => { try { assetModels.value = await apiClient.get('/admin/assets/models'); } catch(e) {} };
 const fetchLogs = async () => {
     try {
@@ -297,11 +485,29 @@ const downloadLogs = async () => {
 
 // Lifecycle
 onMounted(() => {
-    fetchStats(); fetchUsers(); fetchProjects(); fetchAssets(); fetchLogs();
+    fetchStats().then(() => {
+        nextTick(() => { if(currentTab.value === 'dashboard') initCharts(); });
+    }); 
+    fetchUsers(); fetchProjects(); fetchGoviewProjects(); fetchAssets(); fetchLogs();
+    
     statsInterval = setInterval(fetchStats, 2000);
     logsInterval = setInterval(() => { if (currentTab.value === 'logs') fetchLogs(); }, 5000);
 });
-onUnmounted(() => { if (statsInterval) clearInterval(statsInterval); if (logsInterval) clearInterval(logsInterval); });
+onUnmounted(() => { 
+    if (statsInterval) clearInterval(statsInterval); 
+    if (logsInterval) clearInterval(logsInterval);
+    window.removeEventListener('resize', resizeCharts);
+    Object.values(charts).forEach(c => c.dispose());
+});
+
+watch(currentTab, (newVal) => {
+    if(newVal === 'dashboard') {
+        nextTick(() => {
+             initCharts();
+             updateCharts();
+        });
+    }
+});
 
 // Operations
 const deleteUser = async (u) => {
@@ -323,6 +529,27 @@ const togglePublish = async (p, isPublic) => {
 const deleteAsset = async (m) => {
     if(!confirm(`Delete Model ${m.name}?`)) return;
     try { await apiClient.delete(`/admin/assets/models/${m.name}`); fetchAssets(); } catch { $notify({ title: 'Failed', type: 'error' }); }
+};
+
+const deleteGoviewProject = async (g) => {
+    if(!confirm(`Delete GoView Project ${g.project_name}?`)) return;
+    try { await apiClient.delete(`/admin/goview/projects/${g.id}`); fetchGoviewProjects(); $notify({ title: 'Deleted', type: 'success' }); } catch { $notify({ title: 'Failed', type: 'error' }); }
+};
+
+const toggleGoviewPublish = async (g, state) => {
+    try {
+        await apiClient.patch(`/admin/goview/projects/${g.id}/publish`, { state });
+        g.state = state;
+        const status = state === 1 ? 'Published' : 'Unpublished';
+        $notify({ title: status, message: state === 1 ? 'Project is now public.' : 'Project is now private.', type: 'success' });
+    } catch { $notify({ title: 'Failed', type: 'error' }); }
+};
+
+const copyLink = (g) => {
+    const url = `${window.location.origin}/goview/#/chart/preview/${g.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+        $notify({ title: 'Copied', message: url, type: 'success' });
+    });
 };
 
 // Upload Triggers
@@ -422,11 +649,27 @@ const updateDemoTemplate = async (e) => {
 .bi-btn.warning:hover { background: #ffea00; color: #000; }
 
 /* --- Dashboard Grid (KPIs) --- */
-.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+.dashboard-grid { 
+    display: flex; flex-direction: column; gap: 20px;
+}
+.full-width { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; height: 500px; }
+
+.chart-card {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 4px;
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.chart-header {
+    padding: 10px 15px; border-bottom: 1px solid #30363d;
+    font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px;
+}
+.chart-body { flex: 1; min-height: 200px; }
+
+.dash-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .kpi-card {
   background: #0d1117; border-radius: 4px; padding: 20px;
   border: 1px solid #30363d;
   transition: transform 0.2s;
+  flex: 1;
 }
 .kpi-card:hover { border-color: #00d2ff; box-shadow: 0 0 15px rgba(0, 210, 255, 0.05); }
 .kpi-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -479,6 +722,10 @@ const updateDemoTemplate = async (e) => {
 .badge.gray { background: rgba(148, 163, 184, 0.1); color: #cbd5e1; border-color: rgba(148, 163, 184, 0.3); }
 .badge.blue { background: rgba(0, 210, 255, 0.1); color: #00d2ff; border-color: rgba(0, 210, 255, 0.3); }
 .badge.dark { background: #161b22; color: #666; border-color: #30363d; }
+.badge.danger { background: rgba(255, 82, 82, 0.1); color: #ff5252; border-color: rgba(255, 82, 82, 0.3); }
+
+.preview-thumb { width: 40px; height: 30px; border-radius: 2px; overflow: hidden; border: 1px solid #30363d; }
+.preview-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
 .status-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
 .status-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }

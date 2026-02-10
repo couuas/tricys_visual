@@ -49,6 +49,7 @@ const expandedGroupId = ref(null);
 const graphSelectedIds = ref(new Set(['sds', 'plasma', 'tes']));
 
 const currentProjectId = ref(localStorage.getItem('tricys_last_pid') || null);
+const currentProject = ref(null);
 const currentTaskId = ref(null);
 
 let timer = null;
@@ -213,13 +214,16 @@ export function useSimulation() {
 
       // 1. Get Project Details (includes Structure)
       const project = await projectApi.getProject(pid);
+      currentProject.value = project;
       structureData.value = project.structure || { components: [], connections: [] };
       modelConfig.value = project.visual_config || {};
       connectionStyles.value = modelConfig.value?.[CONNECTION_STYLES_KEY] || {};
 
       // Determine Read-Only Status
       const { currentUser } = useAuth();
-      if (currentUser.value) {
+      if (!project.user_id) {
+        isReadOnly.value = true;
+      } else if (currentUser.value) {
         const isOwner = project.user_id === currentUser.value.id;
         const isAdmin = currentUser.value.is_superuser;
         isReadOnly.value = !(isOwner || isAdmin);
@@ -320,6 +324,7 @@ export function useSimulation() {
     // try { await fetch(`${BACKEND_URL}/api/session/clear`, { method: 'POST' }); } catch(e) {}
     pause(); currentTime.value = 0; maxTime.value = 100;
     simulationData.value = null; structureData.value = null; hasSimulationData.value = false;
+    currentProject.value = null;
     modelConfig.value = {}; annotations.value = {}; componentParams.value = []; defaultParams.value = [];
     lastSimConfig.value = null; activeAlert.value = null; ignoredComponents.clear(); alertRules.value = {};
     selectedConnectionId.value = null; connectionStyles.value = {}; currentAnalysisTask.value = null;
@@ -558,7 +563,7 @@ export function useSimulation() {
 
   return {
     // State
-    currentProjectId, currentTaskId, isReadOnly,
+    currentProjectId, currentProject, currentTaskId, isReadOnly,
     simulationData, structureData, componentParams, defaultParams, modelConfig, annotations,
     currentTime, isPlaying, hasSimulationData, maxTime,
     showDashboard, showLabels, showValues, userPrefersDashboard,

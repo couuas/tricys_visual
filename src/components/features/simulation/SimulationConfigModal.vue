@@ -212,9 +212,9 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { taskApi } from '../api/task';
-import { useSimulation } from '../composables/useSimulation';
-import { $notify } from '../utils/notification';
+import { taskApi } from '../../../api/task';
+import { useSimulation } from '../../../composables/useSimulation';
+import { $notify } from '../../../utils/notification';
 
 const props = defineProps({
   visible: Boolean,

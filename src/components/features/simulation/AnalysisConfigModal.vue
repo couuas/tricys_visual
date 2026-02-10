@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="modal-overlay" @click.self="handleClose">
+   <div v-if="visible" class="modal-overlay" @click.self="handleClose" @dblclick.stop>
     <div class="modal-card">
       <!-- Header -->
       <div class="modal-header">
@@ -24,7 +24,7 @@
       </div>
 
       <!-- Main Content Area -->
-      <div class="modal-body">
+      <div class="modal-body" @dblclick.stop>
           
           <!-- Step 1: Template Selection -->
           <div v-if="currentStep === 1" class="step-container">
@@ -205,6 +205,29 @@
                    </div>
                 </div>
 
+                        <!-- LLM Environment Overrides -->
+                        <div class="config-block">
+                            <div class="flex-between mb-2">
+                               <label class="input-label">LLM Env (Optional)</label>
+                            </div>
+                            <div class="grid-2col">
+                               <div>
+                                  <label class="mini-label">API Key</label>
+                                  <input v-model="llmEnvConfig.apiKey" type="password" class="input-styled" placeholder="API_KEY" />
+                               </div>
+                               <div>
+                                  <label class="mini-label">Base URL</label>
+                                  <input v-model="llmEnvConfig.baseUrl" type="text" class="input-styled" placeholder="https://api.siliconflow.cn/v1" />
+                               </div>
+                            </div>
+                            <div class="grid-2col">
+                               <div>
+                                  <label class="mini-label">AI Model</label>
+                                  <input v-model="llmEnvConfig.aiModel" type="text" class="input-styled" placeholder="Qwen/Qwen3-30B-A3B-Instruct-2507" />
+                               </div>
+                            </div>
+                         </div>
+
              </div>
           <div v-else-if="currentStep === 3" class="panel-full step-container fade-in">
              <div class="config-block full-height">
@@ -247,10 +270,10 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { taskApi } from '../api/task';
-import { useSimulation } from '../composables/useSimulation';
-import { useAuth } from '../composables/useAuth'; // Import useAuth
-import { $notify } from '../utils/notification';
+import { taskApi } from '../../../api/task';
+import { useSimulation } from '../../../composables/useSimulation';
+import { useAuth } from '../../../composables/useAuth'; // Import useAuth
+import { $notify } from '../../../utils/notification';
 
 const props = defineProps({
   visible: Boolean,
@@ -374,6 +397,12 @@ const analysisConfig = ref({
   stop_time: 12000.0, // [NEW] Default
   step_size: 0.5,     // [NEW] Default
   metrics_definition: {} // [NEW]
+});
+
+const llmEnvConfig = ref({
+   apiKey: "",
+   baseUrl: "",
+   aiModel: ""
 });
 
 // Metrics State
@@ -530,6 +559,17 @@ function generatePayload() {
             // [FIX 2] Removed top-level metrics_definition
         }
      };
+
+      const llmEnv = {
+         API_KEY: llmEnvConfig.value.apiKey.trim(),
+         BASE_URL: llmEnvConfig.value.baseUrl.trim(),
+         AI_MODEL: llmEnvConfig.value.aiModel.trim()
+      };
+
+      const hasLlmEnv = Object.values(llmEnv).some(v => v);
+      if (hasLlmEnv) {
+         payload.config_json.llm_env = llmEnv;
+      }
     
     const template = selectedTemplate.value;
     
@@ -549,13 +589,17 @@ function generatePayload() {
     
     const dependentVars = Object.keys(activeMetrics); // [FIX 4] Dependent vars are just keys
 
-    const caseDef = {
-        name: analysisConfig.value.name,
-        plot_type: "line",
-        dependent_variables: dependentVars,
-        sweep_time: ["sds.I[1]"],
-        combine_plots: true
-    };
+   const caseDef = {
+      name: analysisConfig.value.name,
+      plot_type: "line",
+      dependent_variables: dependentVars,
+      sweep_time: ["sds.I[1]"],
+      combine_plots: true
+   };
+
+   if (hasLlmEnv) {
+      caseDef.ai = true;
+   }
     
     // Helper to fix double component naming (blanket.blanket.I -> blanket.I)
     const fixParamName = (name) => {
@@ -643,6 +687,7 @@ function safeParseList(str) {
   backdrop-filter: blur(8px);
   z-index: 9999 !important;
   display: flex; align-items: center; justify-content: center;
+   pointer-events: auto;
 }
 
 .modal-card {
@@ -655,6 +700,7 @@ function safeParseList(str) {
   overflow: hidden;
   color: #c9d1d9;
   font-family: 'Inter', sans-serif;
+   position: relative;
 }
 
 .modal-header {
@@ -780,34 +826,68 @@ function safeParseList(str) {
 .back-btn:hover { border-color: #00d2ff; color: #00d2ff; }
 
 .template-grid { 
-   display: flex; flex-wrap: wrap; justify-content: center;
-   gap: 20px; padding: 20px 40px; 
-   max-width: 800px; margin: 0 auto;
+   display: grid;
+   grid-template-columns: repeat(3, minmax(180px, 1fr));
+   gap: 18px;
+   padding: 18px 10px; 
+   max-width: 820px;
+   margin: 0 auto;
 }
 
 .template-card {
-   flex: 0 0 180px; /* Fixed width for consistent sizing */
-   height: 140px;
-   background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-   padding: 15px; cursor: pointer; transition: all 0.2s;
-   display: flex; flex-direction: column; align-items: center; justify-content: center; /* Center content vertically */
-   text-align: center;
-   position: relative; overflow: hidden;
+   height: 150px;
+   background: radial-gradient(120% 120% at 0% 0%, rgba(0, 210, 255, 0.08), transparent 55%),
+                     linear-gradient(145deg, #151b25, #0f141c);
+   border: 1px solid rgba(48, 54, 61, 0.9);
+   border-radius: 12px;
+   padding: 16px 14px;
+   cursor: pointer;
+   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+   display: flex;
+   flex-direction: column;
+   align-items: flex-start;
+   justify-content: space-between;
+   text-align: left;
+   position: relative;
+   overflow: hidden;
+}
+.template-card::after {
+   content: '';
+   position: absolute;
+   inset: 0;
+   background: linear-gradient(120deg, rgba(0, 210, 255, 0.15), transparent 60%);
+   opacity: 0;
+   transition: opacity 0.2s ease;
 }
 .template-card:hover { 
-   border-color: #00d2ff;
-   transform: translateY(-5px); 
-   box-shadow: 0 10px 25px rgba(0, 210, 255, 0.15);
-   background: linear-gradient(145deg, #1f242e, #161b22);
+   border-color: rgba(0, 210, 255, 0.6);
+   transform: translateY(-4px);
+   box-shadow: 0 12px 28px rgba(0, 210, 255, 0.12), inset 0 0 18px rgba(0, 210, 255, 0.08);
 }
-.card-icon { font-size: 28px; margin-bottom: 10px; }
-.card-title { margin: 0 0 5px 0; color: #fff; font-size: 13px; font-weight: 600; }
-.card-desc { font-size: 11px; color: #8b949e; line-height: 1.4; }
+.template-card:hover::after { opacity: 1; }
+.card-icon { font-size: 26px; margin-bottom: 6px; }
+.card-content { z-index: 1; }
+.card-title { margin: 0 0 6px 0; color: #e6edf3; font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
+.card-desc { font-size: 11px; color: #9aa4b2; line-height: 1.5; }
 .card-arrow { 
-   position: absolute; bottom: 10px; right: 10px; opacity: 0; 
-   transform: translateX(-10px); transition: all 0.3s; color: #00d2ff;
+   position: absolute; bottom: 12px; right: 12px; opacity: 0; 
+   transform: translateX(-8px); transition: all 0.2s; color: #00d2ff;
+   z-index: 1;
 }
 .template-card:hover .card-arrow { opacity: 1; transform: translateX(0); }
+
+@media (max-width: 900px) {
+   .template-grid {
+      grid-template-columns: repeat(2, minmax(160px, 1fr));
+   }
+}
+
+@media (max-width: 640px) {
+   .template-grid {
+      grid-template-columns: 1fr;
+   }
+   .template-card { height: 140px; }
+}
 
 .fade-in { animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

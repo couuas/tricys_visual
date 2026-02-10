@@ -7,7 +7,7 @@
 
       <!-- Main Content: Task Detail -->
       <div class="main-panel">
-        <div v-if="selectedTaskId" class="detail-container">
+        <div v-if="selectedTaskId && !isResultView" class="detail-container">
            <TaskStatusPanel 
              :status="currentTask.status"
              :progress="currentTask.progress"
@@ -20,8 +20,14 @@
              @back="handleBack"
            />
         </div>
+        <div v-else-if="selectedTaskId && isResultView" class="detail-container">
+           <ResultViewer
+             :taskId="selectedTaskId"
+             :taskName="getTaskName(selectedTaskId)"
+             @back="handleBack"
+           />
+        </div>
         <div v-else class="dashboard-wrapper">
-           <!-- [NEW] Dashboard Mode -->
            <MonitorDashboard 
              :tasks="tasks" 
              @view-task="handleTaskSelect"
@@ -38,16 +44,24 @@
 import { ref, onMounted, onUnmounted, reactive } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 // TaskList removed
-import TaskStatusPanel from '../components/monitor/TaskStatusPanel.vue';
-import MonitorDashboard from '../components/monitor/MonitorDashboard.vue'; // [NEW]
+import TaskStatusPanel from '../components/features/monitor/TaskStatusPanel.vue';
+import MonitorDashboard from '../components/features/monitor/MonitorDashboard.vue';
+import ResultViewer from '../components/features/result/ResultViewer.vue';
 import { $notify } from '../utils/notification';
 
 import { taskApi } from '../api/task';
+import { projectApi } from '../api/project';
+import { useAuth } from '../composables/useAuth';
+import { useSimulation } from '../composables/useSimulation';
 
 const router = useRouter();
 const route = useRoute();
+const { currentUser } = useAuth();
+const { loadData } = useSimulation();
 const tasks = ref([]);
 const selectedTaskId = ref(null);
+const isResultView = ref(false); // Toggle between Monitor (logs) and Result (files)
+const isReadOnlyPreview = ref(false);
 const currentTask = reactive({
   status: 'PENDING',
   progress: 0,
@@ -66,8 +80,9 @@ let elapsedTimer = null; // Timer for elapsed/ETA
 
 
 const fetchTasks = async () => {
+  const pid = route.query.projectId;
   try {
-    const data = await taskApi.listTasks(null, 20);
+    const data = await taskApi.listTasks(null, 20, 0, pid || null);
     tasks.value = Array.isArray(data) ? data : (data.items || []);
   } catch (e) {
     console.error("Fetch tasks failed", e);
@@ -75,15 +90,44 @@ const fetchTasks = async () => {
   }
 };
 
+const getTaskName = (id) => {
+    const t = tasks.value.find(x => x.id === id);
+    return t ? t.name : 'Task';
+};
+
 const handleBack = () => {
   selectedTaskId.value = null;
+  isResultView.value = false;
   disconnectWS();
   fetchTasks();
 };
 
+const resolvePreviewStatus = async () => {
+  const pid = route.query.projectId;
+  if (!pid) return;
+  try {
+    const project = await projectApi.getProject(pid);
+    const isAdmin = currentUser.value && (currentUser.value.is_superuser === true || currentUser.value.is_superuser === 1);
+    if (project) {
+      if (!project.user_id) {
+        isReadOnlyPreview.value = true;
+      } else if (currentUser.value) {
+        isReadOnlyPreview.value = project.user_id !== currentUser.value.id && !isAdmin;
+      } else {
+        isReadOnlyPreview.value = true;
+      }
+    } else {
+      isReadOnlyPreview.value = false;
+    }
+  } catch (e) {
+    isReadOnlyPreview.value = false;
+  }
+};
+
 const handleTaskSelect = (id) => {
-  if (selectedTaskId.value === id) return;
+  if (selectedTaskId.value === id && !isResultView.value) return;
   selectedTaskId.value = id;
+  isResultView.value = false; // Reset to Monitor/Log view
   // Reset View State
   currentTask.logs = [];
   currentTask.progress = 0;
@@ -289,6 +333,10 @@ const liveLog = (content, level='INFO') => {
 };
 
 const handleStopTask = async () => {
+  if (isReadOnlyPreview.value) {
+    $notify({ title: 'READ ONLY', message: 'Preview projects cannot be stopped.', type: 'warn' });
+    return;
+  }
   try {
        await taskApi.stopTask(selectedTaskId.value);
        $notify({ title: 'STOPPING', message: 'Stop signal sent.', type: 'process' });
@@ -297,25 +345,24 @@ const handleStopTask = async () => {
 
 const handleDirectViewResult = (task) => {
   if (task && task.id) {
-    router.push({ name: 'visualizer', query: { task_id: task.id, projectId: task.project_id } });
+    selectedTaskId.value = task.id;
+    isResultView.value = true;
+    disconnectWS(); // Ensure we don't hold WS for completed task unnecessarily
   }
 };
 
 const handleViewResults = () => {
   if (selectedTaskId.value) {
-    const t = tasks.value.find(x => x.id === selectedTaskId.value);
-    
-    // Check type
-    // Note: Task API might need to return 'type' field explicitly if not already present. 
-    // Usually backend assumes 'type' in task model. We'll check if it's available.
-    // Fallback: If name starts with "Analysis_" or implicitly from logic. But robust way is `task.type`.
-    
-    // Unified redirection to VisualizerView
-    router.push({ name: 'visualizer', query: { task_id: selectedTaskId.value, projectId: t.project_id } });
+    isResultView.value = true;
+    disconnectWS();
   }
 };
 
 const handleDeleteTask = async (id) => {
+  if (isReadOnlyPreview.value) {
+    $notify({ title: 'READ ONLY', message: 'Preview projects cannot delete tasks.', type: 'warn' });
+    return;
+  }
   if (!confirm('Are you sure you want to delete this task? This cannot be undone.')) return;
   
   try {
@@ -339,8 +386,13 @@ const handleDeleteTask = async (id) => {
 
 
 onMounted(async () => {
-    await fetchTasks();
-    pollTimer = setInterval(fetchTasks, 5000); // Polling for list updates
+  const pid = route.query.projectId;
+  if (pid) {
+      await loadData(pid); // Ensure project context for header
+  }
+  await resolvePreviewStatus();
+  await fetchTasks();
+  pollTimer = setInterval(fetchTasks, 5000); // Polling for list updates
     
     // Check route query for auto-selection
     if (route.query.taskId) {
@@ -365,12 +417,13 @@ onUnmounted(() => {
 
 <style scoped>
 .monitor-dashboard {
-  width: 100%; height: 100%;
+  width: 100%; height: calc(100vh - 60px);
   background: #05070a;
   display: flex; flex-direction: column;
   overflow: hidden;
   font-family: 'Inter', sans-serif;
 }
+
 
 
 .nav-tabs { display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
@@ -384,11 +437,22 @@ onUnmounted(() => {
 .nav-arrow { color: #333; font-size: 10px; margin: 0 2px; }
 
 /* Dashboard Body */
-.dashboard-body { flex: 1; display: flex; overflow: hidden; }
+.dashboard-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
 
 
 
-.main-panel { flex: 1; background: #05070a; position: relative; }
+.main-panel {
+  flex: 1;
+  background: #05070a;
+  position: relative;
+  overflow: auto;
+  min-height: 0;
+}
 
 .detail-container { width: 100%; height: 100%; padding: 0; }
 
