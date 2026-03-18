@@ -12,6 +12,7 @@ const defaultParams = ref([]);
 const modelConfig = ref({});
 const annotations = ref({});
 const libraryModels = ref([]);
+const filterSchema = ref([]);
 
 const currentTime = ref(0);
 const isPlaying = ref(false);
@@ -55,6 +56,25 @@ const currentTaskId = ref(null);
 let timer = null;
 
 export function useSimulation() {
+
+  const normalizeFilterSchema = (rules) => {
+    if (!Array.isArray(rules)) return [];
+    return rules
+      .map(rule => {
+        const columns = Array.isArray(rule?.columns)
+          ? rule.columns.filter(column => typeof column === 'string' && column.trim())
+          : [];
+        const normalized = { columns };
+        if (rule?.min !== undefined && rule?.min !== null && rule.min !== '') {
+          normalized.min = Number(rule.min);
+        }
+        if (rule?.max !== undefined && rule?.max !== null && rule.max !== '') {
+          normalized.max = Number(rule.max);
+        }
+        return normalized;
+      })
+      .filter(rule => rule.columns.length > 0 && (rule.min !== undefined || rule.max !== undefined));
+  };
 
   const unflattenAndNormalize = (inputData) => {
     const nested = {};
@@ -276,8 +296,9 @@ export function useSimulation() {
       try {
         const cfg = await projectApi.getRunConfig(pid);
         lastSimConfig.value = cfg;
+        filterSchema.value = normalizeFilterSchema(cfg?.filter_schema);
         if (cfg.simulation && cfg.simulation.step_size) simulationStep.value = parseFloat(cfg.simulation.step_size);
-      } catch (e) { lastSimConfig.value = null; simulationStep.value = 0.5; }
+      } catch (e) { lastSimConfig.value = null; filterSchema.value = []; simulationStep.value = 0.5; }
 
       // 5. UI State
       await loadAlertRules(pid);
@@ -307,10 +328,37 @@ export function useSimulation() {
   };
   const saveAlertRules = async (rules) => {
     alertRules.value = rules || {};
-    if (currentProjectId.value) await projectApi.saveRunConfig(currentProjectId.value, { ...lastSimConfig.value, alert_rules: alertRules.value });
+    if (currentProjectId.value) {
+      const nextConfig = { ...(lastSimConfig.value || {}), alert_rules: alertRules.value };
+      lastSimConfig.value = nextConfig;
+      await projectApi.saveRunConfig(currentProjectId.value, nextConfig);
+    }
     // Note: Backend might need specific endpoint for alerts if not in run_config. 
     // My API analysis showed /projects/{id}/alerts endpoint.
     try { await projectApi.saveAlerts(currentProjectId.value, alertRules.value); } catch (e) { }
+  };
+
+  const saveFilterSchema = async (rules) => {
+    filterSchema.value = normalizeFilterSchema(rules);
+    const nextConfig = { ...(lastSimConfig.value || {}), filter_schema: filterSchema.value };
+    lastSimConfig.value = nextConfig;
+    if (!currentProjectId.value) return;
+    await projectApi.saveRunConfig(currentProjectId.value, nextConfig);
+  };
+
+  const saveComponentFilterRule = async (componentId, rule) => {
+    const column = `${String(componentId || '').toLowerCase()}.I[1]`;
+    const nextRules = filterSchema.value.filter(existing => !Array.isArray(existing.columns) || !existing.columns.includes(column));
+
+    if (rule && (rule.min !== undefined || rule.max !== undefined)) {
+      nextRules.push({
+        columns: [column],
+        ...(rule.min !== undefined ? { min: rule.min } : {}),
+        ...(rule.max !== undefined ? { max: rule.max } : {})
+      });
+    }
+
+    await saveFilterSchema(nextRules);
   };
 
   const play = () => { if (isPlaying.value) return; isPlaying.value = true; if (timer) clearInterval(timer); timer = setInterval(() => { stepTime(simulationStep.value); }, 1000); };
@@ -326,7 +374,7 @@ export function useSimulation() {
     simulationData.value = null; structureData.value = null; hasSimulationData.value = false;
     currentProject.value = null;
     modelConfig.value = {}; annotations.value = {}; componentParams.value = []; defaultParams.value = [];
-    lastSimConfig.value = null; activeAlert.value = null; ignoredComponents.clear(); alertRules.value = {};
+    lastSimConfig.value = null; filterSchema.value = []; activeAlert.value = null; ignoredComponents.clear(); alertRules.value = {};
     selectedConnectionId.value = null; connectionStyles.value = {}; currentAnalysisTask.value = null;
     multiSelectedIds.value.clear(); componentGroups.value = {}; expandedGroupId.value = null;
 
@@ -567,7 +615,7 @@ export function useSimulation() {
     simulationData, structureData, componentParams, defaultParams, modelConfig, annotations,
     currentTime, isPlaying, hasSimulationData, maxTime,
     showDashboard, showLabels, showValues, userPrefersDashboard,
-    libraryModels, modifiedParams, lastSimConfig, simulationStep,
+    libraryModels, modifiedParams, lastSimConfig, simulationStep, filterSchema,
     alertRules, activeAlert, analysisTasks, showAnalysisPanel,
     selectedConnectionId, connectionStyles,
     isDashboardMode, currentAnalysisTask,
@@ -578,7 +626,7 @@ export function useSimulation() {
     // Methods
     loadData, loadModelConfig, loadAnnotations, resetSession, revertParam, updateParam,
     play, pause, setTime, stepTime, togglePlay,
-    saveParameters, saveAnnotations, saveComponentPosition, saveAlertRules, ignoreAlert, confirmAlert,
+    saveParameters, saveAnnotations, saveComponentPosition, saveAlertRules, saveFilterSchema, saveComponentFilterRule, ignoreAlert, confirmAlert,
     getCurrentDataSlice, clearResults, updateDashboardVisibility, fetchLibraryModels, toggleDashboardPref,
     fetchAnalysisTasks, submitAnalysisTask, deleteAnalysisTask, getTaskLogs, getTaskReport,
     getConnectionStyle, updateConnectionStyle, syncAllConnections,

@@ -94,6 +94,30 @@
 
       <div class="divider"></div>
 
+      <template v-if="!isGroup(selectedId)">
+        <div class="section-header-group">
+          <div class="section-label">OUTPUT FILTERS</div>
+          <span class="unlocked-badge">Run Config</span>
+        </div>
+
+        <div class="filter-box">
+          <div class="filter-column-label">{{ `${getSafeId(selectedId)}.I[1]` }}</div>
+          <div class="filter-grid">
+            <div class="form-group compact">
+              <label>Min</label>
+              <input v-model="localFilter.min" type="number" step="any" placeholder="Optional lower bound" class="param-input filter-input" />
+            </div>
+            <div class="form-group compact">
+              <label>Max</label>
+              <input v-model="localFilter.max" type="number" step="any" placeholder="Optional upper bound" class="param-input filter-input" />
+            </div>
+          </div>
+          <div class="filter-hint">Leave both fields empty to remove this component from filter_schema.</div>
+        </div>
+
+        <div class="divider"></div>
+      </template>
+
 
 
       <div class="section-header-group">
@@ -221,7 +245,8 @@ const {
   modelConfig, annotations, saveAnnotations, componentParams, defaultParams, saveParameters,
   libraryModels, fetchLibraryModels,
   hasSimulationData, currentProjectId,
-  isGroup, isExpanded, setExpandedGroup, dissolveGroup, componentGroups, isReadOnly
+  isGroup, isExpanded, setExpandedGroup, dissolveGroup, componentGroups, isReadOnly,
+  filterSchema, saveComponentFilterRule
 } = useSimulation();
 
 import { projectApi } from '../../../api/project';
@@ -233,11 +258,13 @@ const isSuperUser = computed(() => currentUser.value && currentUser.value.is_sup
 const localConfig = ref({ type: 'default', scale: 1.0, url: '' });
 const localNote = ref('');
 const localParamsList = ref([]); // List of { name, value, defaultValue, comment, type }
+const localFilter = ref({ min: '', max: '' });
 
 // Original state tracking
 const originalConfig = ref({});
 const originalNote = ref({});
 const originalParams = ref({});
+const originalFilter = ref({ min: '', max: '' });
 
 const isUploading = ref(false);
 const fileInput = ref(null);
@@ -304,11 +331,23 @@ const loadEditorData = () => {
   localNote.value = (annotations.value && annotations.value[safeId]) || '';
   originalNote.value = localNote.value;
 
+  const safeIdLower = safeId.toLowerCase();
+
+  const outputColumn = `${safeIdLower}.I[1]`;
+  const existingFilterRule = !isGroup(safeId)
+    ? (Array.isArray(filterSchema.value)
+        ? filterSchema.value.find(rule => Array.isArray(rule.columns) && rule.columns.includes(outputColumn))
+        : null)
+    : null;
+  localFilter.value = {
+    min: existingFilterRule?.min ?? '',
+    max: existingFilterRule?.max ?? ''
+  };
+  originalFilter.value = JSON.parse(JSON.stringify(localFilter.value));
+
   // 2. Parameters Loading (Structured List)
   const bufferList = [];
   currentGroupChildren.value = [];
-
-  const safeIdLower = safeId.toLowerCase();
 
   // Helper to find param def in componentParams list
   // componentParams is now expected to be a LIST of ALL params in system
@@ -375,7 +414,8 @@ watch(
     () => props.selectedId, 
     componentParams,     // 监听参数数据变化 (解决加载延迟)
     componentGroups,     // 监听分组数据变化
-    modelConfig          // 监听配置变化
+    modelConfig,         // 监听配置变化
+    filterSchema
   ], 
   loadEditorData, 
   { immediate: true, deep: false } // deep: false 即可，因为 ref 被替换时会触发
@@ -402,11 +442,12 @@ const getParamOwner = (fullName) => {
 const hasChanges = computed(() => {
     const configChanged = JSON.stringify(localConfig.value) !== JSON.stringify(originalConfig.value);
     const noteChanged = localNote.value !== originalNote.value;
-    if (hasSimulationData.value) return configChanged || noteChanged;
+  const filterChanged = JSON.stringify(localFilter.value) !== JSON.stringify(originalFilter.value);
+  if (hasSimulationData.value) return configChanged || noteChanged || filterChanged;
     
     const paramsChanged = JSON.stringify(localParamsList.value) !== JSON.stringify(originalParams.value);
     
-    return configChanged || noteChanged || paramsChanged;
+  return configChanged || noteChanged || paramsChanged || filterChanged;
 });
 
 const getSimpleName = (fullName) => {
@@ -446,9 +487,19 @@ function checkUserInputValue(str) {
     }
 }
 
+  const parseFilterBound = (value, label) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    const numericValue = Number(value);
+    if (Number.isNaN(numericValue)) {
+      throw new Error(`${label} must be a valid number.`);
+    }
+    return numericValue;
+  };
+
 const saveAll = async () => { 
   if (!props.selectedId) return; 
   const safeId = getSafeId(props.selectedId); 
+    let nextFilterRule = null;
   
   if (!hasSimulationData.value) {
       try {
@@ -462,6 +513,20 @@ const saveAll = async () => {
           return;
       }
   }
+
+    if (!isGroup(safeId)) {
+      try {
+        const min = parseFilterBound(localFilter.value.min, 'Filter min');
+        const max = parseFilterBound(localFilter.value.max, 'Filter max');
+        if (min !== undefined && max !== undefined && min > max) {
+          throw new Error('Filter min cannot be greater than max.');
+        }
+        nextFilterRule = (min !== undefined || max !== undefined) ? { min, max } : null;
+      } catch (err) {
+        $notify({ title: 'VALIDATION ERROR', message: err.message, type: 'error', duration: 4000 });
+        return;
+      }
+    }
 
   try { 
     // 1. Config & Annotations (Works for Groups too)
@@ -498,6 +563,12 @@ const saveAll = async () => {
         await saveParameters(componentParams.value); 
         originalParams.value = JSON.parse(JSON.stringify(localParamsList.value)); 
     } 
+
+      if (!isGroup(safeId)) {
+        await saveComponentFilterRule(safeId, nextFilterRule);
+        originalFilter.value = JSON.parse(JSON.stringify(localFilter.value));
+      }
+
     emit('update'); 
     $notify({ title: 'SAVED', message: 'Configuration updated successfully.', type: 'success', duration: 2000 });
   } catch (e) { 
@@ -512,6 +583,7 @@ const resetChanges = () => {
   localParamsList.value = JSON.parse(JSON.stringify(originalParams.value)); 
   localConfig.value = JSON.parse(JSON.stringify(originalConfig.value));
   localNote.value = originalNote.value;
+  localFilter.value = JSON.parse(JSON.stringify(originalFilter.value));
   selectedModelUrl.value = localConfig.value.type === 'custom' ? localConfig.value.url : '';
   onModelSelectChange(); 
 };
@@ -603,8 +675,20 @@ h3 { margin: 0; color: #00d2ff; font-size: 16px; letter-spacing: 1px; white-spac
 .param-comment { font-size: 10px; color: #666; font-style: italic; line-height: 1.2; }
 .param-default { font-size: 9px; color: #444; font-family: monospace; }
 .form-group { margin-bottom: 15px; }
+.form-group.compact { margin-bottom: 0; }
 label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
 textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #eee; padding: 8px; border-radius: 4px; resize: vertical; box-sizing: border-box; }
+
+.filter-box { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(0, 210, 255, 0.12); }
+.filter-column-label { font-size: 11px; color: #00d2ff; font-family: monospace; margin-bottom: 10px; }
+.filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.filter-grid .form-group { min-width: 0; }
+.filter-input { display: block; min-width: 0; box-sizing: border-box; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; padding: 8px 10px; }
+.filter-hint { margin-top: 10px; font-size: 10px; color: #666; line-height: 1.4; }
+
+@media (max-width: 420px) {
+  .filter-grid { grid-template-columns: 1fr; }
+}
 
 .help-btn { background: rgba(0, 210, 255, 0.1); border: 1px solid rgba(0, 210, 255, 0.3); color: #00d2ff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
 .help-btn:hover { background: rgba(0, 210, 255, 0.3); color: #fff; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }

@@ -42,6 +42,21 @@
                   <label class="input-label">Step Size (s)</label>
                   <input v-model.number="simSettings.stepSize" type="number" min="0.001" step="0.01" class="input-styled" />
                 </div>
+                <div class="config-subsection">
+                  <div class="subsection-title">Execution Options</div>
+                  <label class="toggle-row">
+                    <input v-model="simSettings.concurrent" type="checkbox" />
+                    <span>Enable concurrent job execution</span>
+                  </label>
+                  <label class="toggle-row" v-if="simSettings.concurrent">
+                    <input v-model="simSettings.maximizeWorkers" type="checkbox" />
+                    <span>Use maximum available workers</span>
+                  </label>
+                  <div v-if="simSettings.concurrent && !simSettings.maximizeWorkers">
+                    <label class="input-label">Max Workers (Optional)</label>
+                    <input v-model.number="simSettings.maxWorkers" type="number" min="1" step="1" class="input-styled" placeholder="Auto if empty" />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -169,6 +184,81 @@
                </div>
             </div>
 
+            <div class="config-block">
+              <h3 class="block-title flex-between">
+                <span>Output Filters</span>
+                <span class="count-badge">{{ filterSchema.length }} active</span>
+              </h3>
+
+              <div class="add-param-box">
+                <div class="box-label">Add/Modify Output Filter</div>
+
+                <div class="rel-container" ref="filterCompDropdownRef">
+                  <label class="mini-label">Component</label>
+                  <input 
+                    v-model="manualFilter.componentSearch"
+                    @focus="manualFilter.showCompDropdown = true"
+                    placeholder="Search component..."
+                    class="input-mini"
+                  />
+                  <div v-if="manualFilter.showCompDropdown && filteredFilterComponents.length > 0" class="dropdown-list">
+                    <div 
+                      v-for="comp in filteredFilterComponents"
+                      :key="comp"
+                      @click="selectManualFilterComponent(comp)"
+                      class="dropdown-item"
+                    >
+                      {{ comp }}
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="manualFilter.selectedComponent" class="filter-form-grid">
+                  <div>
+                    <label class="mini-label">Min</label>
+                    <input v-model="manualFilter.min" type="number" step="any" class="input-mini" placeholder="Optional" />
+                  </div>
+                  <div>
+                    <label class="mini-label">Max</label>
+                    <input v-model="manualFilter.max" type="number" step="any" class="input-mini" placeholder="Optional" />
+                  </div>
+                </div>
+
+                <div v-if="manualFilter.selectedComponent" class="flex-end-gap">
+                  <div class="filter-column-preview">{{ `${manualFilter.selectedComponent}.I[1]` }}</div>
+                  <button @click="applyManualFilter" class="btn-mini-action">Apply</button>
+                </div>
+              </div>
+
+              <div v-if="filterSchema.length === 0" class="empty-state">
+                No output filters configured. All simulation results will be retained.
+              </div>
+              <div v-else class="filters-list">
+                <div v-for="rule in flatFilterRules" :key="`${rule.displayKey}-${rule.index}`" class="filter-item">
+                  <div class="filter-main">
+                    <div class="filter-columns">{{ rule.displayKey }}</div>
+                    <div class="filter-bounds">
+                      <input 
+                        :value="rule.min"
+                        @change="updateExistingFilter(rule.compId, 'min', $event.target.value)"
+                        class="input-micro"
+                        placeholder="min"
+                      />
+                      <input 
+                        :value="rule.max"
+                        @change="updateExistingFilter(rule.compId, 'max', $event.target.value)"
+                        class="input-micro"
+                        placeholder="max"
+                      />
+                      <button @click="removeExistingFilter(rule.compId)" class="btn-micro-del" title="Remove Filter">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon-xs" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
           
           <!-- Preview Panel -->
@@ -262,6 +352,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { taskApi } from '../../../api/task';
+import { projectApi } from '../../../api/project';
 import { useSimulation } from '../../../composables/useSimulation';
 import { $notify } from '../../../utils/notification';
 
@@ -282,7 +373,10 @@ const {
   modifiedParams, // Computed: { compId: { param: val } }
   updateParam,
   revertParam,
-  structureData 
+  structureData,
+  filterSchema,
+  lastSimConfig,
+  saveComponentFilterRule
 } = useSimulation();
 
 const isSubmitting = ref(false);
@@ -325,7 +419,10 @@ const flatModifiedParams = computed(() => {
 const simSettings = ref({
   customName: "",
   stopTime: 2000,
-  stepSize: 0.1
+  stepSize: 0.1,
+  concurrent: false,
+  maximizeWorkers: false,
+  maxWorkers: null
 });
 
 // Manual Param Selection State (Fuzzy Logic)
@@ -339,8 +436,31 @@ const manualParam = ref({
   value: "" 
 });
 
+const manualFilter = ref({
+  componentSearch: "",
+  selectedComponent: null,
+  showCompDropdown: false,
+  min: "",
+  max: ""
+});
+
 // Metrics JSON
 const showMetricsEditor = ref(false);
+
+const flatFilterRules = computed(() => {
+  if (!Array.isArray(filterSchema.value)) return [];
+  return filterSchema.value.map((rule, index) => {
+    const firstColumn = Array.isArray(rule.columns) && rule.columns.length > 0 ? rule.columns[0] : '';
+    const compId = firstColumn.includes('.') ? firstColumn.split('.')[0] : firstColumn;
+    return {
+      index,
+      compId,
+      displayKey: Array.isArray(rule.columns) ? rule.columns.join(', ') : '',
+      min: rule.min ?? '',
+      max: rule.max ?? ''
+    };
+  });
+});
 const selectedMetricKeys = ref([]); // Active keys
 const metricsDefinition = ref({});
 
@@ -355,6 +475,7 @@ const metricsError = ref("");
 // --- Click Outside Handling ---
 const compDropdownRef = ref(null);
 const paramDropdownRef = ref(null);
+const filterCompDropdownRef = ref(null);
 
 function handleClickOutside(event) {
   if (manualParam.value.showCompDropdown && compDropdownRef.value && !compDropdownRef.value.contains(event.target)) {
@@ -362,6 +483,9 @@ function handleClickOutside(event) {
   }
   if (manualParam.value.showParamDropdown && paramDropdownRef.value && !paramDropdownRef.value.contains(event.target)) {
     manualParam.value.showParamDropdown = false;
+  }
+  if (manualFilter.value.showCompDropdown && filterCompDropdownRef.value && !filterCompDropdownRef.value.contains(event.target)) {
+    manualFilter.value.showCompDropdown = false;
   }
 }
 
@@ -387,8 +511,25 @@ watch(() => props.visible, async (val) => {
              await loadData(router.currentRoute.value.query.projectId);
         }
       }
+
+      const config = lastSimConfig.value || {};
+      const simulation = config.simulation || {};
+      if (simulation.stop_time !== undefined) simSettings.value.stopTime = simulation.stop_time;
+      if (simulation.step_size !== undefined) simSettings.value.stepSize = simulation.step_size;
+      simSettings.value.concurrent = Boolean(simulation.concurrent);
+      simSettings.value.maximizeWorkers = Boolean(simulation.maximize_workers);
+      simSettings.value.maxWorkers = simulation.max_workers ?? null;
+      if (config.metrics_definition) {
+        metricsJsonString.value = JSON.stringify(config.metrics_definition, null, 4);
+      }
    }
 });
+
+  watch(() => simSettings.value.maximizeWorkers, (value) => {
+    if (value) {
+      simSettings.value.maxWorkers = null;
+    }
+  });
 
 // --- Computed: Fuzzy Search ---
 
@@ -398,6 +539,12 @@ const filteredComponents = computed(() => {
    const q = manualParam.value.componentSearch.toLowerCase();
    if (!q) return componentsList.value;
    return componentsList.value.filter(c => c.toLowerCase().includes(q));
+});
+
+const filteredFilterComponents = computed(() => {
+  const q = manualFilter.value.componentSearch.toLowerCase();
+  if (!q) return componentsList.value;
+  return componentsList.value.filter(c => c.toLowerCase().includes(q));
 });
 
 const filteredParameters = computed(() => {
@@ -423,6 +570,15 @@ function selectManualComponent(comp) {
   manualParam.value.showCompDropdown = false;
   manualParam.value.paramSearch = "";
   manualParam.value.selectedParam = null;
+}
+
+function selectManualFilterComponent(comp) {
+  const existingRule = flatFilterRules.value.find(rule => rule.compId === comp);
+  manualFilter.value.selectedComponent = comp;
+  manualFilter.value.componentSearch = comp;
+  manualFilter.value.showCompDropdown = false;
+  manualFilter.value.min = existingRule?.min ?? "";
+  manualFilter.value.max = existingRule?.max ?? "";
 }
 
 function selectManualParam(param) {
@@ -469,6 +625,57 @@ async function revertExistingParam(compId, key) {
     await revertParam(compId, key);
 }
 
+function parseFilterBound(value, label) {
+  if (value === '' || value === null || value === undefined) return undefined;
+  const numericValue = Number(value);
+  if (Number.isNaN(numericValue)) {
+    throw new Error(`${label} must be a valid number.`);
+  }
+  return numericValue;
+}
+
+async function applyManualFilter() {
+  if (!manualFilter.value.selectedComponent) return;
+
+  try {
+    const min = parseFilterBound(manualFilter.value.min, 'Filter min');
+    const max = parseFilterBound(manualFilter.value.max, 'Filter max');
+    if (min !== undefined && max !== undefined && min > max) {
+      throw new Error('Filter min cannot be greater than max.');
+    }
+    await saveComponentFilterRule(
+      manualFilter.value.selectedComponent,
+      (min !== undefined || max !== undefined) ? { min, max } : null
+    );
+  } catch (err) {
+    alert('Validation Error: ' + err.message);
+  }
+}
+
+async function updateExistingFilter(compId, bound, value) {
+  const existingRule = flatFilterRules.value.find(rule => rule.compId === compId);
+  if (!existingRule) return;
+
+  try {
+    const nextMin = bound === 'min' ? parseFilterBound(value, 'Filter min') : parseFilterBound(existingRule.min, 'Filter min');
+    const nextMax = bound === 'max' ? parseFilterBound(value, 'Filter max') : parseFilterBound(existingRule.max, 'Filter max');
+    if (nextMin !== undefined && nextMax !== undefined && nextMin > nextMax) {
+      throw new Error('Filter min cannot be greater than max.');
+    }
+    await saveComponentFilterRule(compId, (nextMin !== undefined || nextMax !== undefined) ? { min: nextMin, max: nextMax } : null);
+  } catch (err) {
+    alert('Validation Error: ' + err.message);
+  }
+}
+
+async function removeExistingFilter(compId) {
+  await saveComponentFilterRule(compId, null);
+  if (manualFilter.value.selectedComponent === compId) {
+    manualFilter.value.min = '';
+    manualFilter.value.max = '';
+  }
+}
+
 
 // Metrics
 
@@ -511,6 +718,8 @@ async function confirmSubmit() {
    
    try {
       const payload = JSON.parse(previewPayload.value); // Use what is reviewed
+
+  await projectApi.saveRunConfig(router.currentRoute.value.query.projectId, payload.config_json);
       
       const taskObj = await taskApi.createTask(payload);
       
@@ -600,10 +809,14 @@ function generatePayload() {
                model_name: props.modelMetadata.modelName || "example_model.Cycle",
                stop_time: simSettings.value.stopTime,
                step_size: simSettings.value.stepSize,
+           concurrent: simSettings.value.concurrent,
+           maximize_workers: simSettings.value.maximizeWorkers,
+           ...(simSettings.value.concurrent && !simSettings.value.maximizeWorkers && simSettings.value.maxWorkers ? { max_workers: simSettings.value.maxWorkers } : {}),
                variableFilter: defaultFilter 
            }, 
            simulation_parameters: simParams, 
-           metrics_definition: metrics
+           metrics_definition: metrics,
+           ...(filterSchema.value.length > 0 ? { filter_schema: filterSchema.value } : {})
        }
     };
     
@@ -677,6 +890,10 @@ function generatePayload() {
 
 .input-label { display: block; color: #8b949e; font-size: 11px; font-weight: 600; margin-bottom: 5px; }
 .mini-label { display: block; color: #8b949e; font-size: 10px; text-transform: uppercase; margin-bottom: 4px; }
+.config-subsection { margin-top: 12px; padding-top: 12px; border-top: 1px solid #21262d; }
+.subsection-title { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c9d1d9; margin-bottom: 8px; cursor: pointer; }
+.toggle-row input { cursor: pointer; }
 
 .input-styled, .input-mini, .input-micro, .textarea-code {
   width: 100%; box-sizing: border-box;
@@ -770,6 +987,13 @@ function generatePayload() {
 .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #c9d1d9; font-size: 11px; }
 .metric-key { font-family: monospace; color: #00d2ff; }
 .mini-tag { font-size: 9px; background: #21262d; padding: 2px 6px; border-radius: 4px; color: #8b949e; }
+.filters-list { display: flex; flex-direction: column; gap: 8px; }
+.filter-item { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 8px 10px; }
+.filter-main { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.filter-columns { font-size: 11px; color: #00d2ff; font-family: 'JetBrains Mono', monospace; }
+.filter-bounds { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.filter-column-preview { flex: 1; font-size: 11px; color: #00d2ff; font-family: 'JetBrains Mono', monospace; align-self: center; }
 
 
 

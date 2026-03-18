@@ -101,52 +101,56 @@ const navigateTo = (name) => {
 
 <style scoped>
 .app-sidebar {
-  width: 60px;
+  width: 68px;
   height: 100%;
   box-sizing: border-box;
-  background: #0b0e14;
-  border-right: 1px solid #30363d;
+  background: linear-gradient(180deg, rgba(9, 13, 19, 0.97) 0%, rgba(5, 8, 12, 0.98) 100%);
+  border-right: 1px solid var(--shell-border);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: 14px 0 12px;
   z-index: 1000;
   flex-shrink: 0;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,0.02), 14px 0 32px rgba(0,0,0,0.18);
+  font-family: var(--shell-nav-font);
 }
 
 .app-sidebar.is-expanded {
-  width: 200px;
+  width: 220px;
   align-items: stretch;
-  padding: 10px 10px;
+  padding: 14px 10px 12px;
 }
 
 .sidebar-toggle {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 44px;
+  height: 42px;
   width: 100%;
-  color: #666;
+  color: var(--shell-text-muted);
   cursor: pointer;
   transition: all 0.2s;
+  border-radius: 10px;
 }
 
 .sidebar-toggle:hover {
-  color: #00d2ff;
+  color: var(--shell-accent);
+  background: rgba(255,255,255,0.04);
 }
 
 .app-sidebar.is-expanded .sidebar-toggle {
   justify-content: flex-end;
-  padding-right: 14px;
+  padding-right: 12px;
 }
 
 .sidebar-group {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
   width: 100%;
 }
 
@@ -155,20 +159,20 @@ const navigateTo = (name) => {
 }
 
 .sidebar-item {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #666;
+  gap: 4px;
+  color: var(--shell-text-muted);
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 14px;
   transition: all 0.2s;
   position: relative;
   overflow: hidden;
-  border-left: 3px solid transparent;
-  border-right: 3px solid transparent;
+  border: 1px solid transparent;
   box-sizing: border-box;
 }
 
@@ -176,50 +180,52 @@ const navigateTo = (name) => {
   width: 100%;
   flex-direction: row;
   justify-content: flex-start;
-  padding: 0 15px;
+  min-height: 48px;
+  padding: 0 14px;
 }
 
 .sidebar-item:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: #ccc;
+  color: var(--shell-text);
+  border-color: rgba(159, 177, 195, 0.12);
+  transform: translateX(1px);
 }
 
 .sidebar-item.active {
-  background: rgba(0, 210, 255, 0.1);
-  color: #00d2ff;
-  border-left-color: #00d2ff;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+  background: linear-gradient(90deg, rgba(0, 210, 255, 0.18) 0%, rgba(0, 210, 255, 0.08) 100%);
+  color: var(--shell-accent);
+  border-color: rgba(0, 210, 255, 0.26);
+  box-shadow: inset 2px 0 0 var(--shell-accent), 0 0 18px rgba(0, 210, 255, 0.08);
 }
 
 .icon {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
   display: flex;
   justify-content: center;
 }
 
 .app-sidebar.is-expanded .icon {
-  width: 24px;
+  width: 22px;
   margin-right: 12px;
   flex-shrink: 0;
 }
 
 .label-mini {
-  font-size: 8px;
-  margin-top: 3px;
+  font-size: var(--shell-font-xs);
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
 }
 
 .label-full {
-  font-size: 14px;
+  font-size: var(--shell-font-md);
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
 }
 
-.admin-side-item { margin-top: 5px; border: 1px solid rgba(255, 0, 85, 0.2); }
+.admin-side-item { margin-top: 8px; border-color: rgba(255, 0, 85, 0.2); }
 .admin-side-item .icon { color: #ff0055; filter: drop-shadow(0 0 5px rgba(255, 0, 85, 0.5)); }
 .admin-side-item:hover { background: rgba(255, 0, 85, 0.1); border-color: #ff0055; }
 .app-sidebar.is-expanded .admin-side-item .label-full { color: #ff0055; }
@@ -229,5 +235,20 @@ const navigateTo = (name) => {
   height: 1px;
   background: #30363d;
   margin: 5px 0;
+}
+
+@media (max-width: 900px) {
+  .app-sidebar {
+    width: 62px;
+  }
+
+  .app-sidebar.is-expanded {
+    width: 200px;
+  }
+
+  .sidebar-item {
+    width: 44px;
+    min-height: 48px;
+  }
 }
 </style>

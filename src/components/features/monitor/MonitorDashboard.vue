@@ -501,8 +501,14 @@ watch(() => props.tasks, calculateStats, { deep: true });
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow-y: auto; /* Enable vertical scroll */
+  min-height: 0;
+  overflow: hidden;
   overflow-x: hidden;
+}
+
+.dashboard-top-section {
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 
@@ -552,17 +558,19 @@ watch(() => props.tasks, calculateStats, { deep: true });
   border: 1px solid #30363d;
   border-radius: 8px;
   padding: 0;
-  overflow: visible; /* Let it expand */
+  overflow: hidden;
   display: flex; flex-direction: column;
-  min-height: 0; /* Allow shrinking to content */
-  height: fit-content;
-  margin-bottom: 30px; /* Space at bottom */
+  flex: 1 1 auto;
+  min-height: 220px;
+  margin-bottom: 0;
 }
 
 .card-header-flex {
     padding: 12px 20px;
     border-bottom: 1px solid #30363d;
     display: flex; justify-content: space-between; align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
     background: rgba(255,255,255,0.02);
 }
 
@@ -572,11 +580,14 @@ watch(() => props.tasks, calculateStats, { deep: true });
 }
 
 .filter-controls {
-    display: flex; align-items: center; gap: 16px;
+  display: flex; align-items: center; gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .filter-group {
     display: flex; align-items: center; gap: 6px; font-size: 10px; color: #666; font-weight: 600;
+  flex-shrink: 0;
 }
 
 .filter-select {
@@ -594,14 +605,20 @@ watch(() => props.tasks, calculateStats, { deep: true });
 .checkbox-label span { font-size: 10px; font-weight: 600; }
 
 .table-container { 
-    padding: 0; 
-    /* Remove flex/overflow to let table expand */
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
-.dash-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+.dash-table { width: 100%; min-width: 900px; border-collapse: separate; border-spacing: 0; font-size: 11px; }
 .dash-table th { 
     text-align: left; padding: 12px 16px; color: #666; font-weight: 700; 
     border-bottom: 1px solid #30363d; letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #0d1117;
 }
 .dash-table td { padding: 10px 16px; color: #ccc; border-bottom: 1px solid rgba(255,255,255,0.02); vertical-align: middle; }
 .dash-table tr { transition: background 0.2s; }
@@ -675,6 +692,116 @@ watch(() => props.tasks, calculateStats, { deep: true });
     .charts-row { grid-template-columns: 1fr; height: auto; }
     .donut-card { height: 300px; }
     .trend-card { height: 300px; }
+  .card-header-flex {
+    align-items: flex-start;
+  }
+
+  .filter-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-height: 900px) {
+  .dashboard-container {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    gap: 16px;
+  }
+
+  .dash-header {
+    margin-bottom: 16px;
+  }
+
+  .kpi-grid {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .charts-row {
+    height: 240px;
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-height: 760px) {
+  .dashboard-container {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .dash-header {
+    margin-bottom: 12px;
+  }
+
+  .dash-header h2 {
+    font-size: 18px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .kpi-grid {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .charts-row {
+    height: 190px;
+    margin-bottom: 12px;
+  }
+
+  .chart-card {
+    padding: 12px;
+  }
+
+  .chart-wrapper {
+    min-height: 120px;
+  }
+
+  .table-card {
+    min-height: 180px;
+  }
+}
+
+@media (max-width: 760px) {
+  .table-card {
+    margin-bottom: 20px;
+  }
+
+  .card-header-flex {
+    padding: 12px 14px;
+  }
+
+  .filter-controls {
+    gap: 10px;
+  }
+
+  .filter-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .filter-select {
+    min-width: 120px;
+  }
+
+  .table-container {
+    min-height: 0;
+  }
+
+  .dash-table th,
+  .dash-table td {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .vis-active-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 
 /* Merged Styles */

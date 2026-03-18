@@ -61,35 +61,56 @@ const projectLabel = computed(() => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
 .top-bar {
-  height: 60px; flex-shrink: 0;
-  background: rgba(5, 7, 10, 0.95);
-  border-bottom: 1px solid #1a202c;
+  height: 64px; flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(11, 16, 23, 0.98) 0%, rgba(8, 12, 18, 0.94) 100%);
+  border-bottom: 1px solid var(--shell-border-strong);
   display: flex; justify-content: space-between; align-items: center;
-  padding: 0 24px;
+  padding: 0 24px 0 28px;
   z-index: 500;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--shell-nav-font);
   box-sizing: border-box;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
-.brand-area { display: flex; align-items: center; gap: 12px; }
+.brand-area { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .logo-mark { 
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
   font-size: 20px; 
-  color: #00d2ff; 
-  text-shadow: 0 0 12px rgba(0, 210, 255, 0.6); 
+  color: var(--shell-accent); 
+  text-shadow: 0 0 12px rgba(0, 210, 255, 0.45);
+  background: radial-gradient(circle at 30% 30%, rgba(0, 210, 255, 0.18), rgba(0, 210, 255, 0.04));
+  border: 1px solid rgba(0, 210, 255, 0.2);
+  border-radius: 10px;
   animation: blink 3s infinite; 
 }
-.logo-type { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: 1.5px; }
-.highlight { color: #00d2ff; } 
+.logo-type {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--shell-text);
+  letter-spacing: 1.4px;
+}
+.highlight { color: var(--shell-accent); } 
 .platform-name { 
-  font-size: 11px; color: #64748b; 
-  border-left: 1px solid #334155; padding-left: 12px; margin-left: 12px; 
-  letter-spacing: 0.5px; 
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: var(--shell-font-xs);
+  color: var(--shell-text-muted);
+  border-left: 1px solid rgba(159, 177, 195, 0.2);
+  padding-left: 12px;
+  margin-left: 2px;
+  letter-spacing: 0.9px;
+  font-family: var(--shell-ui-font);
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-area { display: flex; align-items: center; gap: 0; height: 100%; }
@@ -97,23 +118,23 @@ const projectLabel = computed(() => {
 .status-group {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 16px;
-  border-radius: 4px;
-  height: 38px;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  min-height: 34px;
   border: 1px solid transparent;
   transition: all 0.3s ease;
 }
 
 .user-group {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(159, 177, 195, 0.14);
 }
 
 .project-group {
-  background: rgba(0, 210, 255, 0.1);
-  border-color: rgba(0, 210, 255, 0.3);
-  box-shadow: 0 0 10px rgba(0, 210, 255, 0.1);
+  background: rgba(0, 210, 255, 0.08);
+  border-color: rgba(0, 210, 255, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(0, 210, 255, 0.04), 0 0 10px rgba(0, 210, 255, 0.06);
 }
 
 .status-group:hover {
@@ -135,11 +156,13 @@ const projectLabel = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 16px;
+  height: 16px;
 }
 
-.user-group .icon-box { color: #94a3b8; }
+.user-group .icon-box { color: var(--shell-text-secondary); }
 .project-group .icon-box { 
-  color: #00d2ff; 
+  color: var(--shell-accent); 
   filter: drop-shadow(0 0 2px rgba(0, 210, 255, 0.5));
 }
 
@@ -147,37 +170,67 @@ const projectLabel = computed(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .label {
   font-size: 10px;
-  color: #94a3b8;
-  letter-spacing: 1px;
+  color: var(--shell-text-secondary);
+  letter-spacing: 0.9px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .value {
-  font-size: 14px;
-  color: #fff;
+  font-size: 13px;
+  color: var(--shell-text);
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
-.value.muted { color: #64748b; font-weight: 500; }
-.value.highlight-text { color: #fff; text-shadow: 0 0 5px rgba(0, 210, 255, 0.5); }
+.value.muted { color: var(--shell-text-muted); font-weight: 500; }
+.value.highlight-text { color: var(--shell-text); text-shadow: 0 0 5px rgba(0, 210, 255, 0.35); }
 
 .divider {
   width: 1px;
   height: 24px;
-  background: #1e293b;
+  background: rgba(159, 177, 195, 0.16);
   margin: 0 8px;
 }
 
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
 @media (max-width: 900px) {
+  .top-bar { padding: 0 18px; }
   .platform-name { display: none; }
+  .logo-type { font-size: 16px; }
+  .value { font-size: 12px; }
+  .status-group { padding: 5px 10px; min-height: 32px; }
+}
+
+@media (max-width: 700px) {
+  .top-bar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 64px;
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .brand-area,
+  .status-area {
+    width: 100%;
+  }
+
+  .status-area {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .divider {
+    display: none;
+  }
 }
 </style>
