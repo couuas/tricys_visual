@@ -24,17 +24,26 @@
             </div>
         </div>
 
+        <!-- Collapsible Layout Toolbar -->
         <div class="layout-toolbar">
-            <button class="toolbar-btn" :disabled="!canUndo" @click.stop="undoLayout">Undo</button>
-            <button class="toolbar-btn" :disabled="!canRedo" @click.stop="redoLayout">Redo</button>
-            <div class="toolbar-divider"></div>
-            <button class="toolbar-btn" @click.stop="saveLayoutSnapshot">Save Snapshot</button>
-            <select class="toolbar-select" v-model="selectedSnapshotId" :disabled="layoutSnapshots.length === 0">
-                <option v-if="layoutSnapshots.length === 0" value="">No snapshots</option>
-                <option v-for="s in layoutSnapshots" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-            <button class="toolbar-btn" :disabled="!selectedSnapshotId" @click.stop="restoreLayoutSnapshot">Restore</button>
-            <button class="toolbar-btn" :disabled="!selectedSnapshotId" @click.stop="deleteLayoutSnapshot">Delete</button>
+            <button class="toolbar-btn toggle-btn" @click.stop="showLayoutControls = !showLayoutControls" :title="showLayoutControls ? 'Collapse Controls' : 'Expand Controls'">
+                <span class="icon">{{ showLayoutControls ? '✕' : '⚙' }}</span>
+            </button>
+            <div class="toolbar-divider" v-show="showLayoutControls"></div>
+            <transition name="toolbar-slide">
+                <div class="toolbar-content" v-show="showLayoutControls">
+                    <button class="toolbar-btn" :disabled="!canUndo" @click.stop="undoLayout">Undo</button>
+                    <button class="toolbar-btn" :disabled="!canRedo" @click.stop="redoLayout">Redo</button>
+                    <div class="toolbar-divider"></div>
+                    <button class="toolbar-btn" @click.stop="saveLayoutSnapshot">Save</button>
+                    <select class="toolbar-select" v-model="selectedSnapshotId" :disabled="layoutSnapshots.length === 0">
+                        <option v-if="layoutSnapshots.length === 0" value="">No snapshots</option>
+                        <option v-for="s in layoutSnapshots" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    </select>
+                    <button class="toolbar-btn" :disabled="!selectedSnapshotId" @click.stop="restoreLayoutSnapshot">Restore</button>
+                    <button class="toolbar-btn" :disabled="!selectedSnapshotId" @click.stop="deleteLayoutSnapshot">Delete</button>
+                </div>
+            </transition>
         </div>
 
         <div v-if="isBoxSelecting" class="select-rect" :style="{ left: selectionRect.x + 'px', top: selectionRect.y + 'px', width: selectionRect.w + 'px', height: selectionRect.h + 'px' }"></div>
@@ -84,6 +93,42 @@
         <div class="note-content">{{ hoverInfo.note }}</div>
       </div>
     </div>
+
+    <!-- Floating Dock Toolbar -->
+    <div class="scene-toolbar-float" v-if="!isReadOnly">
+      <div class="toolbar-dock">
+
+        <button 
+          class="dock-btn-hero primary" 
+          :class="{ 'running': isSimulating }"
+          @click.stop="emit('run-simulation')" 
+        >
+           <div class="btn-content">
+             <span class="icon-lg" v-if="isSimulating">⟳</span>
+             <span class="icon-lg" v-else>▶</span>
+             <div class="text-group">
+                <span class="btn-title">{{ isSimulating ? 'SIMULATION BUSY' : 'RUN SIMULATION' }}</span>
+                <span class="btn-sub">{{ isSimulating ? 'Processing...' : 'Start Basic Task' }}</span>
+             </div>
+           </div>
+           <div class="shine-effect"></div>
+        </button>
+        
+        <div class="vr-divider"></div>
+
+        <button class="dock-btn secondary" @click.stop="emit('run-analysis')">
+           <span class="icon">⚡</span>
+           <span class="label">ANALYSIS</span>
+        </button>
+
+        <button class="dock-btn flat" @click.stop="emit('clear-parameters')">
+           <span class="icon">✕</span>
+           <span class="label">CLEAR</span>
+        </button>
+
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -100,7 +145,10 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { useSimulation } from '../../../composables/useSimulation';
 import { useRouter } from 'vue-router';
 
-const emit = defineEmits(['selectComponent', 'groupContext']);
+const props = defineProps({
+    isSimulating: { type: Boolean, default: false }
+});
+const emit = defineEmits(['selectComponent', 'groupContext', 'run-simulation', 'run-analysis', 'clear-parameters']);
 const router = useRouter();
 
 const { 
@@ -158,6 +206,7 @@ const modelProgressMap = reactive({});
 const progressTimers = new Map();
 const progressTimeouts = new Map();
 const lastModelConfig = ref({});
+const showLayoutControls = ref(false);
 
 let hoverTimer = null;
 const HOVER_DELAY = 400;
@@ -1837,8 +1886,13 @@ defineExpose({ reloadComponent });
 .hover-tooltip { position: fixed; z-index: 9999; background: rgba(10, 15, 20, 0.95); border: 1px solid rgba(0, 210, 255, 0.5); border-radius: 8px; padding: 12px; pointer-events: none; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); min-width: 200px; max-width: 380px; backdrop-filter: blur(8px); transform: translate(10px, 10px); }
 .select-rect { position: absolute; border: 1px dashed rgba(0, 210, 255, 0.8); background: rgba(0, 210, 255, 0.08); z-index: 50; pointer-events: none; }
 .selection-toolbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(5, 10, 15, 0.8); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 8px; padding: 8px 10px; z-index: 60; display: flex; flex-direction: column; gap: 6px; backdrop-filter: blur(6px); }
-.layout-toolbar { position: absolute; top: 10px; right: 10px; z-index: 60; display: flex; gap: 6px; background: rgba(5, 10, 15, 0.6); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 6px; backdrop-filter: blur(6px); }
-.toolbar-divider { width: 1px; background: rgba(255,255,255,0.15); margin: 0 4px; }
+.layout-toolbar { position: absolute; top: 15px; right: 15px; z-index: 60; display: flex; align-items: center; gap: 6px; background: rgba(13, 17, 23, 0.85); border: 1px solid rgba(255,255,255,0.11); border-radius: 12px; padding: 6px; backdrop-filter: blur(12px); box-shadow: 0 8px 25px rgba(0,0,0,0.4); transition: all 0.3s ease; }
+.toolbar-content { display: flex; align-items: center; gap: 6px; }
+.toggle-btn { background: rgba(0, 210, 255, 0.1) !important; color: #00d2ff !important; border: 1px solid rgba(0, 210, 255, 0.3) !important; border-radius: 8px !important; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0 !important; cursor: pointer; transition: all 0.2s; }
+.toggle-btn:hover { background: rgba(0, 210, 255, 0.2) !important; color: #fff !important; }
+.toolbar-slide-enter-active, .toolbar-slide-leave-active { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.toolbar-slide-enter-from, .toolbar-slide-leave-to { opacity: 0; transform: translateX(15px); }
+.toolbar-divider { width: 1px; background: rgba(255,255,255,0.15); margin: 0 4px; height: 16px; }
 .toolbar-select { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); color: #e0f7ff; font-size: 11px; border-radius: 4px; padding: 3px 6px; max-width: 160px; }
 .toolbar-select:disabled { opacity: 0.4; }
 .toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -1881,4 +1935,102 @@ defineExpose({ reloadComponent });
 :deep(.label-title) { font-size: 11px; color: #cfe6f7; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 2px; text-align: center; }
 :deep(.label-metric) { font-family: "Consolas", monospace; font-size: 13px; color: #8fe1ff; font-weight: 700; text-align: center; }
 :deep(.label-title.group) { background: rgba(35, 55, 75, 0.8); color: #cfe6f7; border: 1px solid rgba(120, 170, 210, 0.4); border-radius: 4px; padding: 2px 6px; display: inline-block; }
+
+/* --- Modern Floating Dock Toolbar inside 3D Scene --- */
+
+.scene-toolbar-float {
+  position: absolute; bottom: 20px; right: 20px;
+  z-index: 500;
+  display: flex;
+}
+
+.toolbar-dock {
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 14px;
+  padding: 6px 10px;
+  display: flex; align-items: center; gap: 6px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.toolbar-dock:hover {
+  background: rgba(13, 17, 23, 0.95);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+}
+
+.vr-divider {
+  width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 2px;
+}
+
+/* Base Dock Button */
+.dock-btn {
+  background: transparent; border: none; color: #8b949e;
+  height: 36px; padding: 0 12px; border-radius: 6px;
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  cursor: pointer; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+
+.dock-btn .icon { font-size: 13px; }
+
+/* Secondary Variant (Analysis) */
+.dock-btn.secondary { color: #c9d1d9; background: rgba(255,255,255,0.03); border: 1px solid transparent; }
+.dock-btn.secondary:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.1); }
+.dock-btn.secondary:active { transform: scale(0.98); }
+
+/* Flat Variant (Clear) */
+.dock-btn.flat { color: #8b949e; }
+.dock-btn.flat:hover { color: #f85149; background: rgba(248, 81, 73, 0.1); }
+
+/* Hero Button (Simulate) */
+.dock-btn-hero {
+  background: linear-gradient(135deg, #1f6feb, #00d2ff); /* Professional Blue-Cyan Gradient */
+  border: none;
+  height: 42px; padding: 0 16px 0 12px;
+  border-radius: 8px;
+  color: white;
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 110, 255, 0.25);
+  transition: all 0.3s;
+}
+
+.dock-btn-hero:hover {
+  filter: brightness(1.1); transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 110, 255, 0.35);
+}
+.dock-btn-hero:active { transform: translateY(0); }
+
+.dock-btn-hero.running {
+   background: #30363d; cursor: wait; color: #8b949e; box-shadow: none;
+}
+
+.dock-btn-hero .btn-content {
+  display: flex; align-items: center; gap: 10px; z-index: 2;
+}
+
+.dock-btn-hero .icon-lg { font-size: 16px; }
+
+.dock-btn-hero .text-group {
+  display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1;
+}
+
+.dock-btn-hero .btn-title { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; }
+.dock-btn-hero .btn-sub { font-size: 8px; opacity: 0.8; font-weight: 500; }
+
+/* Shine Effect */
+.shine-effect {
+  position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform: skewX(-20deg);
+  transition: 0.5s;
+}
+.dock-btn-hero:hover .shine-effect { left: 150%; transition: 0.7s; }
+
 </style>

@@ -1,10 +1,7 @@
 <template>
-  <div class="app-sidebar">
-    <!-- Top Actions (Home/Logo substitute if needed, but we have Header) -->
-    <!-- We can put a 'Return to Home' button here explicitly -->
+  <div class="app-sidebar" :class="{ 'is-expanded': isExpanded }">
     <!-- Top Actions -->
     <div class="sidebar-group top">
-      
       <div 
         class="sidebar-item" 
         :class="{ active: currentRouteName === 'config' || currentRouteName === 'demo' }"
@@ -12,7 +9,8 @@
         title="Configuration"
       >
         <span class="icon">⚙</span>
-        <span class="label-mini">CFG</span>
+        <span class="label-mini" v-show="!isExpanded">CFG</span>
+        <span class="label-full" v-show="isExpanded">Configuration</span>
       </div>
 
       <div 
@@ -22,14 +20,9 @@
         title="Monitor"
       >
         <span class="icon">⚡</span>
-        <span class="label-mini">MON</span>
+        <span class="label-mini" v-show="!isExpanded">MON</span>
+        <span class="label-full" v-show="isExpanded">Monitor</span>
       </div>
-
-
-
-
-
-
 
       <div 
         class="sidebar-item" 
@@ -38,11 +31,10 @@
         title="GoView"
       >
         <span class="icon">📊</span>
-        <span class="label-mini">GOV</span>
+        <span class="label-mini" v-show="!isExpanded">GOV</span>
+        <span class="label-full" v-show="isExpanded">GoView</span>
       </div>
     </div>
-
-    
 
     <!-- Bottom Actions -->
     <div class="sidebar-group bottom">
@@ -54,6 +46,7 @@
         title="Admin Panel"
       >
         <span class="icon">🛡️</span>
+        <span class="label-full" v-show="isExpanded">Admin Panel</span>
       </div>
 
       <div 
@@ -63,6 +56,7 @@
         title="User Profile"
       >
         <span class="icon">👤</span>
+        <span class="label-full" v-show="isExpanded">User Profile</span>
       </div>
 
       <div 
@@ -72,13 +66,20 @@
         title="Help / Documentation"
       >
         <span class="icon">?</span>
+        <span class="label-full" v-show="isExpanded">Help</span>
+      </div>
+
+      <!-- Toggle Button -->
+      <div class="sidebar-toggle" @click="toggleSidebar" :title="isExpanded ? 'Collapse' : 'Expand'">
+        <svg v-if="isExpanded" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '../../composables/useAuth';
 
@@ -86,6 +87,11 @@ const route = useRoute();
 const router = useRouter();
 const { currentUser } = useAuth();
 const currentRouteName = computed(() => route.name);
+
+const isExpanded = ref(false);
+const toggleSidebar = () => {
+  isExpanded.value = !isExpanded.value;
+};
 
 const navigateTo = (name) => {
   const pid = route.query.projectId || localStorage.getItem('tricys_last_pid');
@@ -107,6 +113,33 @@ const navigateTo = (name) => {
   padding: 10px 0;
   z-index: 1000;
   flex-shrink: 0;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-sidebar.is-expanded {
+  width: 200px;
+  align-items: stretch;
+  padding: 10px 10px;
+}
+
+.sidebar-toggle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 44px;
+  width: 100%;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar-toggle:hover {
+  color: #00d2ff;
+}
+
+.app-sidebar.is-expanded .sidebar-toggle {
+  justify-content: flex-end;
+  padding-right: 14px;
 }
 
 .sidebar-group {
@@ -115,6 +148,10 @@ const navigateTo = (name) => {
   align-items: center;
   gap: 15px;
   width: 100%;
+}
+
+.app-sidebar.is-expanded .sidebar-group {
+  align-items: stretch;
 }
 
 .sidebar-item {
@@ -129,6 +166,17 @@ const navigateTo = (name) => {
   border-radius: 8px;
   transition: all 0.2s;
   position: relative;
+  overflow: hidden;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  box-sizing: border-box;
+}
+
+.app-sidebar.is-expanded .sidebar-item {
+  width: 100%;
+  flex-direction: row;
+  justify-content: flex-start;
+  padding: 0 15px;
 }
 
 .sidebar-item:hover {
@@ -139,7 +187,7 @@ const navigateTo = (name) => {
 .sidebar-item.active {
   background: rgba(0, 210, 255, 0.1);
   color: #00d2ff;
-  border-left: 3px solid #00d2ff; /* Workbench style active indicator */
+  border-left-color: #00d2ff;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
@@ -147,6 +195,14 @@ const navigateTo = (name) => {
 .icon {
   font-size: 20px;
   line-height: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.app-sidebar.is-expanded .icon {
+  width: 24px;
+  margin-right: 12px;
+  flex-shrink: 0;
 }
 
 .label-mini {
@@ -156,9 +212,17 @@ const navigateTo = (name) => {
   letter-spacing: 0.5px;
 }
 
+.label-full {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
 .admin-side-item { margin-top: 5px; border: 1px solid rgba(255, 0, 85, 0.2); }
 .admin-side-item .icon { color: #ff0055; filter: drop-shadow(0 0 5px rgba(255, 0, 85, 0.5)); }
 .admin-side-item:hover { background: rgba(255, 0, 85, 0.1); border-color: #ff0055; }
+.app-sidebar.is-expanded .admin-side-item .label-full { color: #ff0055; }
 
 .divider {
   width: 30px;

@@ -2,7 +2,10 @@
   <div class="editor-panel" :class="{ open: selectedId, 'embedded-mode': embedded }" @click.stop>
     
     <div class="header">
-      <h3>{{ selectedId ? (isGroup(selectedId) ? "Group: " : "Component: ") + selectedId.toUpperCase() : 'Component Setting' }}</h3>
+      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+        <h3>{{ selectedId ? (isGroup(selectedId) ? "Group: " : "Component: ") + selectedId.toUpperCase() : 'Component Setting' }}</h3>
+        <button v-if="selectedId" class="help-btn" @click.stop="showFormatHelp" title="Parameter format help">?</button>
+      </div>
       
       <button 
         v-if="!embedded || allowClose" 
@@ -91,37 +94,7 @@
 
       <div class="divider"></div>
 
-      <template v-if="!isGroup(selectedId)">
-        <div class="section-header-group">
-          <div class="section-label">INVENTORY ALERT</div>
-          <span v-if="hasSimulationData" class="locked-badge">🔒 Locked</span>
-        </div>
-        <div class="alert-config-box" :class="{ 'box-disabled': hasSimulationData }">
-          <div class="form-row-center">
-            <label class="switch">
-              <input type="checkbox" v-model="localAlert.enabled" :disabled="hasSimulationData">
-              <span class="slider round" :class="{ disabled: hasSimulationData }"></span>
-            </label>
-            <span class="switch-label" :class="{ active: localAlert.enabled }">
-              {{ localAlert.enabled ? 'Alert Enabled' : 'Alert Disabled' }}
-            </span>
-          </div>
-          <transition name="slide-fade">
-            <div v-if="localAlert.enabled" class="alert-inputs">
-              <span class="static-text">Trigger when Inventory is:</span>
-              <div class="input-group">
-                <select v-model="localAlert.operator" class="op-select" :disabled="hasSimulationData">
-                  <option value=">">&gt; (Greater than)</option>
-                  <option value="<">&lt; (Less than)</option>
-                </select>
-                <input type="number" v-model.number="localAlert.threshold" class="val-input" placeholder="Value" :disabled="hasSimulationData">
-                <span class="unit">g</span>
-              </div>
-            </div>
-          </transition>
-        </div>
-        <div class="divider"></div>
-      </template>
+
 
       <div class="section-header-group">
          <div class="section-label">VISUAL SETTINGS</div>
@@ -183,6 +156,54 @@
       <div class="icon">👆</div>
       <div>Select a component to edit.</div>
     </div>
+
+    <!-- Format Help Modal -->
+    <transition name="dropdown-fade">
+      <div v-if="showHelp" class="help-overlay" @click.stop="showHelp = false">
+        <div class="help-dialog custom-scroll" @click.stop>
+          <div class="help-header">
+            <h4><span class="icon">💡</span> Parameter Formats</h4>
+            <button class="close-help-btn" @click="showHelp = false">×</button>
+          </div>
+          <div class="help-content">
+            <p class="help-intro">The following advanced formats are strictly supported when modifying parameters:</p>
+            <ul class="help-list">
+              <li>
+                <div class="hl-type">Array Parameter Initialization</div>
+                <div class="hl-desc">Assigns structural array values. Capable of enveloping sweep declarations.</div>
+                <div class="hl-code"><code>{1, 2, 3}</code></div>
+                <div class="hl-code highlight-code"><strong>Example:</strong> <code>"{1, [1,2,3], '1:2:1'}"</code> sweeps the 2nd and 3rd elements individually.</div>
+              </li>
+              <li>
+                <div class="hl-type">Parameter Sweep List</div>
+                <div class="hl-desc">Defines a finite set of simulation iterations for a scalar element.</div>
+                <div class="hl-code"><code>[1, 2, 3]</code></div>
+              </li>
+              <li>
+                <div class="hl-type">Range Iteration</div>
+                <div class="hl-desc">Sweep sequence start:stop:step.</div>
+                <div class="hl-code"><code>1:100:2</code></div>
+              </li>
+              <li>
+                <div class="hl-type">Linspace Generation</div>
+                <div class="hl-desc">Linear step distribution array.</div>
+                <div class="hl-code"><code>linspace:start:stop:samples</code></div>
+              </li>
+              <li>
+                <div class="hl-type">Random Variables</div>
+                <div class="hl-desc">Uniformly distributed random sets.</div>
+                <div class="hl-code"><code>rand:min:max:samples</code></div>
+              </li>
+              <li>
+                <div class="hl-type">File Import</div>
+                <div class="hl-desc">Extract array sweeps from a target csv/json file.</div>
+                <div class="hl-code"><code>file:path/to/data.csv</code></div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -199,7 +220,6 @@ const emit = defineEmits(['close', 'update', 'close-panel']);
 const { 
   modelConfig, annotations, saveAnnotations, componentParams, defaultParams, saveParameters,
   libraryModels, fetchLibraryModels,
-  alertRules, saveAlertRules,
   hasSimulationData, currentProjectId,
   isGroup, isExpanded, setExpandedGroup, dissolveGroup, componentGroups, isReadOnly
 } = useSimulation();
@@ -213,13 +233,11 @@ const isSuperUser = computed(() => currentUser.value && currentUser.value.is_sup
 const localConfig = ref({ type: 'default', scale: 1.0, url: '' });
 const localNote = ref('');
 const localParamsList = ref([]); // List of { name, value, defaultValue, comment, type }
-const localAlert = ref({ enabled: false, operator: '>', threshold: 1000 });
 
 // Original state tracking
 const originalConfig = ref({});
-const originalNote = ref('');
+const originalNote = ref({});
 const originalParams = ref({});
-const originalAlert = ref({});
 
 const isUploading = ref(false);
 const fileInput = ref(null);
@@ -258,6 +276,12 @@ const handleUnmerge = async () => {
         dissolveGroup(props.selectedId);
         emit('close');
     }
+};
+
+const showHelp = ref(false);
+
+const showFormatHelp = () => {
+    showHelp.value = true;
 };
 
 // --- DATA LOADING & WATCHING ---
@@ -300,6 +324,22 @@ const loadEditorData = () => {
   // Assuming componentParams is array:
   const allParams = Array.isArray(componentParams.value) ? componentParams.value : [];
   
+  const formatArrayParam = (p) => {
+      let cloned = { ...p };
+      const convert = (val) => {
+          if (Array.isArray(val)) return '{' + val.join(', ') + '}';
+          if (typeof val === 'string' && val.trim().startsWith('[') && val.trim().endsWith(']')) {
+              return '{' + val.trim().slice(1, -1) + '}';
+          }
+          return val;
+      };
+      cloned.defaultValue = convert(cloned.defaultValue);
+      if (cloned.value !== undefined && cloned.value !== null) {
+          cloned.value = convert(cloned.value);
+      }
+      return cloned;
+  };
+
   if (isGroup(safeId)) {
       // GROUP LOGIC
        if (componentGroups.value && componentGroups.value[safeId]) {
@@ -311,37 +351,22 @@ const loadEditorData = () => {
                   const prefix = childId + ".";
                   const childParams = allParams.filter(p => p.name.startsWith(prefix));
                   childParams.forEach(p => {
-                       bufferList.push({ ...p }); // Clone
+                       bufferList.push(formatArrayParam(p));
                   });
               });
           }
       }
   } else {
       // SINGLE COMPONENT LOGIC
-      // Filter params starting with "safeId."
-      // BUT existing logic used lowercase.
-      // LayoutService stores "Type.Param" e.g. "plasma.fb".
-      // Our ID might be "plasma".
-      // Let's match case-insensitive or expect componentParams to have consistent keys.
-      
-      bufferList.push(...allParams.filter(p => p.name.toLowerCase().startsWith(safeIdLower + ".")));
+      const filteredParams = allParams.filter(p => p.name.toLowerCase().startsWith(safeIdLower + "."));
+      filteredParams.forEach(p => {
+           bufferList.push(formatArrayParam(p));
+      });
   }
   
   localParamsList.value = bufferList;
   // Deep clone for original state
   originalParams.value = JSON.parse(JSON.stringify(bufferList));
-
-  // 3. Alerts
-  if (!isGroup(safeId)) {
-      const rules = alertRules.value || {};
-      const rule = rules[safeId];
-      if (rule) {
-          localAlert.value = { ...rule };
-      } else {
-          localAlert.value = { enabled: false, operator: '>', threshold: 1000 };
-      }
-      originalAlert.value = JSON.parse(JSON.stringify(localAlert.value));
-  }
 };
 
 // 2. 使用数组监听：同时监听 ID 变化 和 数据源变化
@@ -350,7 +375,6 @@ watch(
     () => props.selectedId, 
     componentParams,     // 监听参数数据变化 (解决加载延迟)
     componentGroups,     // 监听分组数据变化
-    alertRules,          // 监听警报规则变化
     modelConfig          // 监听配置变化
   ], 
   loadEditorData, 
@@ -381,10 +405,8 @@ const hasChanges = computed(() => {
     if (hasSimulationData.value) return configChanged || noteChanged;
     
     const paramsChanged = JSON.stringify(localParamsList.value) !== JSON.stringify(originalParams.value);
-    // Only check alert changes if not group
-    const alertChanged = !isGroup(props.selectedId) && JSON.stringify(localAlert.value) !== JSON.stringify(originalAlert.value);
     
-    return configChanged || noteChanged || paramsChanged || alertChanged;
+    return configChanged || noteChanged || paramsChanged;
 });
 
 const getSimpleName = (fullName) => {
@@ -406,11 +428,41 @@ const revertToDefault = (name) => {
     }
 };
 
-// --- SAVING ---
+function checkUserInputValue(str) {
+    if (typeof str !== 'string') return;
+    const s = str.trim();
+    if (!s) return;
+    
+    if (s.startsWith('{') && s.endsWith('}')) return;
+    if (s.startsWith('[') && s.endsWith(']')) {
+        try { JSON.parse(s); return; } catch (e) { throw new Error(`Invalid JSON array format: ${s}`); }
+    }
+    const prefixes = ['linspace:', 'log:', 'rand:', 'file:'];
+    if (prefixes.some(p => s.toLowerCase().startsWith(p))) return;
+    if (/^-?[0-9.]+:-?[0-9.]+:-?[0-9.]+$/.test(s)) return;
+    
+    if (s.includes(',')) {
+        throw new Error(`Invalid format "${s}". Please use brackets [1, 2, 3] for lists or {1, 2, 3} for array expansions.`);
+    }
+}
 
 const saveAll = async () => { 
   if (!props.selectedId) return; 
   const safeId = getSafeId(props.selectedId); 
+  
+  if (!hasSimulationData.value) {
+      try {
+          localParamsList.value.forEach(p => {
+              if (p.value !== undefined && p.value !== null) {
+                  checkUserInputValue(String(p.value));
+              }
+          });
+      } catch (err) {
+          $notify({ title: 'VALIDATION ERROR', message: err.message, type: 'error', duration: 4000 });
+          return;
+      }
+  }
+
   try { 
     // 1. Config & Annotations (Works for Groups too)
     // Update local modelConfig state for immediate reflection
@@ -445,15 +497,6 @@ const saveAll = async () => {
         
         await saveParameters(componentParams.value); 
         originalParams.value = JSON.parse(JSON.stringify(localParamsList.value)); 
-
-        // 3. Alerts (Single only)
-        if (!isGroup(safeId)) {
-            const newRules = { ...(alertRules.value || {}) }; 
-            if (localAlert.value.enabled) { newRules[safeId] = { ...localAlert.value }; } 
-            else { delete newRules[safeId]; } 
-            await saveAlertRules(newRules);
-            originalAlert.value = JSON.parse(JSON.stringify(localAlert.value)); 
-        }
     } 
     emit('update'); 
     $notify({ title: 'SAVED', message: 'Configuration updated successfully.', type: 'success', duration: 2000 });
@@ -467,9 +510,6 @@ const saveAll = async () => {
 
 const resetChanges = () => { 
   localParamsList.value = JSON.parse(JSON.stringify(originalParams.value)); 
-  if (!isGroup(props.selectedId)) {
-      localAlert.value = JSON.parse(JSON.stringify(originalAlert.value));
-  }
   localConfig.value = JSON.parse(JSON.stringify(originalConfig.value));
   localNote.value = originalNote.value;
   selectedModelUrl.value = localConfig.value.type === 'custom' ? localConfig.value.url : '';
@@ -562,21 +602,30 @@ h3 { margin: 0; color: #00d2ff; font-size: 16px; letter-spacing: 1px; white-spac
 .param-meta-row { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
 .param-comment { font-size: 10px; color: #666; font-style: italic; line-height: 1.2; }
 .param-default { font-size: 9px; color: #444; font-family: monospace; }
-.no-params { color: #555; font-style: italic; font-size: 12px; text-align: center; padding: 10px 0; }
-.alert-config-box { background: rgba(255, 82, 82, 0.05); border: 1px solid rgba(255, 82, 82, 0.2); border-radius: 6px; padding: 10px; transition: opacity 0.3s; } .alert-config-box.box-disabled { opacity: 0.6; pointer-events: none; }
-.form-row-center { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.switch { position: relative; display: inline-block; width: 34px; height: 18px; } .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 34px; } .slider.disabled { cursor: not-allowed; background-color: #333; } .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; } input:checked + .slider { background-color: #ff5252; } input:checked + .slider:before { transform: translateX(16px); }
-.switch-label { color: #888; font-size: 12px; font-weight: bold; transition: color 0.2s; } .switch-label.active { color: #ff5252; }
-.alert-inputs { display: flex; flex-direction: column; gap: 5px; }
-.static-text { font-size: 11px; color: #888; }
-.input-group { display: flex; gap: 5px; align-items: center; }
-.op-select { flex: 1; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid #555; border-radius: 4px; padding: 4px; font-family: monospace; cursor: pointer; }
-.val-input { width: 70px; background: rgba(0,0,0,0.3); color: #ff5252; border: 1px solid #555; border-radius: 4px; padding: 4px 4px; font-family: monospace; text-align: right; } .val-input:focus { border-color: #ff5252; outline: none; }
-.unit { color: #888; font-size: 11px; }
 .form-group { margin-bottom: 15px; }
 label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
 textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #eee; padding: 8px; border-radius: 4px; resize: vertical; box-sizing: border-box; }
+
+.help-btn { background: rgba(0, 210, 255, 0.1); border: 1px solid rgba(0, 210, 255, 0.3); color: #00d2ff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+.help-btn:hover { background: rgba(0, 210, 255, 0.3); color: #fff; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+
+/* Format Help Modal Styles */
+.help-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 20, 0.85); backdrop-filter: blur(5px); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box; }
+.help-dialog { background: #1a1f28; border: 1px solid #00d2ff; border-radius: 10px; width: 100%; max-height: 100%; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; }
+.help-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(0, 210, 255, 0.2); background: rgba(0, 210, 255, 0.05); }
+.help-header h4 { margin: 0; color: #00d2ff; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.close-help-btn { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; transition: color 0.2s; }
+.close-help-btn:hover { color: #ff5252; }
+.help-content { padding: 15px; }
+.help-intro { font-size: 11px; color: #aaa; margin: 0 0 15px 0; line-height: 1.4; }
+.help-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 15px; }
+.help-list li { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 6px; }
+.hl-type { font-size: 12px; font-weight: bold; color: #00d2ff; margin-bottom: 4px; }
+.hl-desc { font-size: 11px; color: #888; margin-bottom: 8px; }
+.hl-code { font-size: 11px; font-family: "Consolas", monospace; background: rgba(0, 0, 0, 0.4); padding: 6px 8px; border-radius: 4px; border: 1px solid #333; color: #eee; }
+.hl-code code { color: #ffca28; font-weight: bold; }
+.hl-code.highlight-code { margin-top: 6px; border-left: 3px solid #ffca28; background: rgba(255, 202, 40, 0.05); color: #ccc; }
+
 input[type="range"] { width: 100%; cursor: pointer; accent-color: #00d2ff; }
 .row-space-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }

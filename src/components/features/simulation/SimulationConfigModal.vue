@@ -23,16 +23,15 @@
             <!-- Block 1: Settings -->
             <div class="config-block">
               <h3 class="block-title">Simulation Settings</h3>
-              <div class="grid-2col">
-                <div class="col-span-2">
-
+              <div class="space-y-4">
+                <div>
                    <label class="input-label">Task Name (Optional)</label>
-                   <input v-model="simSettings.customName" placeholder="Auto-generated if empty" class="input-styled mb-4" />
-
+                   <input v-model="simSettings.customName" placeholder="Auto-generated if empty" class="input-styled" />
+                </div>
+                <div>
                    <label class="input-label">Model Name</label>
                    <div class="input-group">
                      <input :value="modelMetadata.modelName || 'example_model.Cycle'" readonly class="input-styled readonly" />
-                     <!-- Upload Removed as requested -->
                    </div>
                 </div>
                 <div>
@@ -49,7 +48,10 @@
             <!-- Block 2: Parameters -->
             <div class="config-block">
                <h3 class="block-title flex-between">
-                 Parameter Overrides
+                 <div style="display: flex; align-items: center; gap: 8px;">
+                    Parameter Overrides
+                    <button class="help-btn" @click.prevent="showHelp = true" title="Parameter format help">?</button>
+                 </div>
                  <span class="count-badge">{{ flatModifiedParams.length }} active</span>
                </h3>
                
@@ -204,7 +206,54 @@
              </button>
           </template>
       </div>
-
+      
+      <!-- Format Help Modal -->
+      <transition name="dropdown-fade">
+        <div v-if="showHelp" class="help-overlay" @click.stop="showHelp = false">
+          <div class="help-dialog custom-scroll" @click.stop>
+            <div class="help-header">
+              <h4><span class="icon">💡</span> Parameter Formats</h4>
+              <button class="close-help-btn" @click="showHelp = false">×</button>
+            </div>
+            <div class="help-content">
+              <p class="help-intro">The following advanced formats are strictly supported when modifying parameters:</p>
+              <ul class="help-list">
+                <li>
+                  <div class="hl-type">Array Parameter Initialization</div>
+                  <div class="hl-desc">Assigns structural array values. Capable of enveloping sweep declarations.</div>
+                  <div class="hl-code"><code>{1, 2, 3}</code></div>
+                  <div class="hl-code highlight-code"><strong>Example:</strong> <code>"{1, [1,2,3], '1:2:1'}"</code> sweeps the 2nd and 3rd elements individually.</div>
+                </li>
+                <li>
+                  <div class="hl-type">Parameter Sweep List</div>
+                  <div class="hl-desc">Defines a finite set of simulation iterations for a scalar element.</div>
+                  <div class="hl-code"><code>[1, 2, 3]</code></div>
+                </li>
+                <li>
+                  <div class="hl-type">Range Iteration</div>
+                  <div class="hl-desc">Sweep sequence start:stop:step.</div>
+                  <div class="hl-code"><code>1:100:2</code></div>
+                </li>
+                <li>
+                  <div class="hl-type">Linspace Generation</div>
+                  <div class="hl-desc">Linear step distribution array.</div>
+                  <div class="hl-code"><code>linspace:start:stop:samples</code></div>
+                </li>
+                <li>
+                  <div class="hl-type">Random Variables</div>
+                  <div class="hl-desc">Uniformly distributed random sets.</div>
+                  <div class="hl-code"><code>rand:min:max:samples</code></div>
+                </li>
+                <li>
+                  <div class="hl-type">File Import</div>
+                  <div class="hl-desc">Extract array sweeps from a target csv/json file.</div>
+                  <div class="hl-code"><code>file:path/to/data.csv</code></div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
   </div>
 </template>
@@ -223,6 +272,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'simulation-started']);
 const router = useRouter();
+
+const showHelp = ref(false);
 
 // --- Composable Access ---
 const { 
@@ -384,36 +435,33 @@ function selectManualParam(param) {
 async function applyManualParam() {
   if (!manualParam.value.selectedComponent || !manualParam.value.selectedParam) return;
   
-  // Need raw key name without component prefix if grouped
-  // Our selectManualParam stores param.name which is FULL NAME usually?
-  // Let's check `parameterList`. It just pushes `p`.
-  // `p.name` is usually full name e.g. "Comp.Param".
-  // `updateParam` expects (compId, paramName, value).
-  // ParamName should be the leaf name OR full name if cleaner handled.
-  // `useSimulation.js` lines 106-107: splits on dot. 
-  // It handles reconstruction. 
-  // BUT `updateParam` (line 345): constructed fullName = compId + '.' + paramName.
-  
-  // So if I pass compId='Comp' and paramName='Comp.Param', it becomes 'Comp.Comp.Param'. WRONG.
-  // I need to strip compId from paramName if it exists.
-  
   const compId = manualParam.value.selectedComponent;
-  let paramName = manualParam.value.selectedParam; // This is full name from componentParams
+  let paramName = manualParam.value.selectedParam;
   
-  // Strip Comp ID
   if (paramName.startsWith(compId + '.')) {
       paramName = paramName.slice(compId.length + 1);
   }
   
-  await updateParam(compId, paramName, manualParam.value.value);
+  try {
+      parseUserInputValue(manualParam.value.value);
+  } catch (err) {
+      alert("Validation Error: " + err.message);
+      return;
+  }
   
-  // Reset
-  // manualParam.value.paramSearch = "";
-  // manualParam.value.selectedParam = null;
-  // manualParam.value.value = "";
+  await updateParam(compId, paramName, manualParam.value.value);
 }
 
 async function updateExistingParam(compId, key, val) {
+    try {
+        parseUserInputValue(val);
+    } catch (err) {
+        alert("Validation Error: " + err.message);
+        // Force reactivity to reset the DOM element visual to the state value since 
+        // the $event string is not saved, by triggering a dummy ref update.
+        modifiedParams.value = { ...modifiedParams.value }; 
+        return;
+    }
     await updateParam(compId, key, val);
 }
 
@@ -489,6 +537,28 @@ async function confirmSubmit() {
    } 
 }
 
+function parseUserInputValue(str) {
+    if (typeof str !== 'string') return str;
+    const s = str.trim();
+    if (!s) return "";
+    
+    if (s.startsWith('{') && s.endsWith('}')) return s;
+    if (s.startsWith('[') && s.endsWith(']')) {
+        try { return JSON.parse(s); } catch (e) { throw new Error(`Invalid JSON array format: ${s}`); }
+    }
+    const prefixes = ['linspace:', 'log:', 'rand:', 'file:'];
+    if (prefixes.some(p => s.toLowerCase().startsWith(p))) return s;
+    if (/^-?[0-9.]+:-?[0-9.]+:-?[0-9.]+$/.test(s)) return s;
+    
+    if (s.includes(',')) {
+        throw new Error(`Invalid format "${s}". Please use brackets [1, 2, 3] for lists or {1, 2, 3} for array expansions.`);
+    }
+    
+    if (!isNaN(Number(s))) return Number(s);
+    
+    return s;
+}
+
 function generatePayload() {
     // 1. Convert Manual Params to Dict from SYNCED state
     const simParams = {};
@@ -499,22 +569,7 @@ function generatePayload() {
                // If compId is 'global', key is key.
                // Else compId.key
                const displayKey = compId === 'global' ? key : `${compId}.${key}`;
-               
-               let cleanVal = val;
-               if (typeof cleanVal === 'string' && cleanVal.trim().startsWith('[') && cleanVal.trim().endsWith(']')) {
-                    try { 
-                        cleanVal = JSON.parse(cleanVal.trim()); 
-                    } catch(e) {
-                        // If parse fails, treat as string? Or leave as is?
-                    }
-               } else if (!isNaN(Number(cleanVal)) && cleanVal !== "") {
-                   // If it's a simple number string, convert to number
-                   // But if user wants array, they must use [ ... ]
-                   cleanVal = Number(cleanVal);
-               }
-               
-               // Existing logic forced array. Now we allow scalar if it's not an array.
-               simParams[displayKey] = cleanVal;
+               simParams[displayKey] = parseUserInputValue(val);
             }
         }
     }
@@ -735,5 +790,28 @@ function generatePayload() {
 }
 .full-height { height: 100%; display: flex; flex-direction: column; }
 .full-height .preview-box { flex: 1; }
+
+.help-btn { background: rgba(0, 210, 255, 0.1); border: 1px solid rgba(0, 210, 255, 0.3); color: #00d2ff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; cursor: pointer; flex-shrink: 0; transition: all 0.2s; padding: 0;}
+.help-btn:hover { background: rgba(0, 210, 255, 0.3); color: #fff; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+
+/* Format Help Modal Styles */
+.help-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 20, 0.85); backdrop-filter: blur(5px); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box; }
+.help-dialog { background: #1a1f28; border: 1px solid #00d2ff; border-radius: 10px; width: 100%; max-width: 400px; max-height: 100%; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; margin: auto; }
+.help-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(0, 210, 255, 0.2); background: rgba(0, 210, 255, 0.05); }
+.help-header h4 { margin: 0; color: #00d2ff; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.close-help-btn { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; transition: color 0.2s; }
+.close-help-btn:hover { color: #ff5252; }
+.help-content { padding: 15px; }
+.help-intro { font-size: 11px; color: #aaa; margin: 0 0 15px 0; line-height: 1.4; text-align: left;}
+.help-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 15px; text-align: left;}
+.help-list li { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 6px; }
+.hl-type { font-size: 12px; font-weight: bold; color: #00d2ff; margin-bottom: 4px; }
+.hl-desc { font-size: 11px; color: #888; margin-bottom: 8px; }
+.hl-code { font-size: 11px; font-family: "Consolas", monospace; background: rgba(0, 0, 0, 0.4); padding: 6px 8px; border-radius: 4px; border: 1px solid #333; color: #eee; }
+.hl-code code { color: #ffca28; font-weight: bold; }
+.hl-code.highlight-code { margin-top: 6px; border-left: 3px solid #ffca28; background: rgba(255, 202, 40, 0.05); color: #ccc; }
+
+.dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-10px); }
+.dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: all 0.2s ease; }
 
 </style>

@@ -34,7 +34,11 @@
              v-if="isReady" 
              key="3d-scene"
              ref="sceneRef" 
+             :isSimulating="isSimulating"
              @selectComponent="handleSelect" 
+             @run-simulation="handleSimButtonClick"
+             @run-analysis="showAnalysisModal = true"
+             @clear-parameters="handleResetParameters"
            />
          </transition>
          
@@ -195,40 +199,7 @@
     <transition name="pop-in"><div v-if="activeAlert" class="alert-modal-overlay"><div class="alert-card"><div class="alert-header"><span class="alert-icon-lg">⚠️</span><h3>INVENTORY ALERT</h3></div><div class="alert-body"><div class="alert-info-row"><span class="lbl">Component:</span><span class="val">{{ activeAlert.id.toUpperCase() }}</span></div><div class="alert-info-row"><span class="lbl">Time:</span><span class="val">{{ activeAlert.time }} h</span></div><div class="alert-info-row"><span class="lbl">Value:</span><span class="val highlight">{{ activeAlert.value }} g</span></div><div class="alert-condition">Condition: Value {{ activeAlert.rule }}</div></div><div class="alert-footer"><button class="btn-ignore" @click="ignoreAlert(activeAlert.id)">Ignore</button><button class="btn-ack" @click="confirmAlert">Acknowledge</button></div></div></div></transition>
     
 
-    <!-- Modern Floating Dock Toolbar -->
-    <div class="view-toolbar-float" v-show="!isEditorMode && !(showUploadOverlay && !isDemo) && !isReadOnly">
-      <div class="toolbar-dock">
 
-        <button 
-          class="dock-btn-hero primary" 
-          :class="{ 'running': isSimulating, 'disabled': isReadOnly }"
-          @click.stop="!isReadOnly && handleSimButtonClick()" 
-        >
-           <div class="btn-content">
-             <span class="icon-lg" v-if="isSimulating">⟳</span>
-             <span class="icon-lg" v-else>▶</span>
-             <div class="text-group">
-                <span class="btn-title">{{ isSimulating ? 'SIMULATION BUSY' : 'RUN SIMULATION' }}</span>
-                <span class="btn-sub">{{ isSimulating ? 'Processing...' : 'Start Basic Task' }}</span>
-             </div>
-           </div>
-           <div class="shine-effect"></div>
-        </button>
-        
-        <div class="vr-divider"></div>
-
-        <button class="dock-btn secondary" @click.stop="showAnalysisModal = true" :disabled="isReadOnly">
-           <span class="icon">⚡</span>
-           <span class="label">ANALYSIS</span>
-        </button>
-
-        <button class="dock-btn flat" @click.stop="handleResetParameters" :disabled="isReadOnly">
-           <span class="icon">✕</span>
-           <span class="label">CLEAR</span>
-        </button>
-
-      </div>
-    </div>
 
     <transition name="fade"><button v-if="isEditorMode" class="exit-fs-btn" @click="exitFullscreen">✕ EXIT EDITOR</button></transition>
 
@@ -1273,102 +1244,5 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 }
 .readonly-badge .icon { font-size: 14px; }
 
-
-/* --- Modern Floating Dock Toolbar --- */
-
-.view-toolbar-float {
-  position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-  z-index: 500;
-  display: flex; justify-content: center;
-}
-
-.toolbar-dock {
-  background: rgba(13, 17, 23, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-  border-radius: 16px;
-  padding: 8px 12px;
-  display: flex; align-items: center; gap: 8px;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.toolbar-dock:hover {
-  background: rgba(13, 17, 23, 0.95);
-  border-color: rgba(255,255,255,0.2);
-  transform: translateY(-2px);
-  box-shadow: 0 25px 60px rgba(0,0,0,0.7);
-}
-
-.vr-divider {
-  width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px;
-}
-
-/* Base Dock Button */
-.dock-btn {
-  background: transparent; border: none; color: #8b949e;
-  height: 40px; padding: 0 16px; border-radius: 8px;
-  display: flex; align-items: center; gap: 8px;
-  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
-  cursor: pointer; transition: all 0.2s;
-  position: relative; overflow: hidden;
-}
-
-.dock-btn .icon { font-size: 14px; }
-
-/* Secondary Variant (Analysis) */
-.dock-btn.secondary { color: #c9d1d9; background: rgba(255,255,255,0.03); border: 1px solid transparent; }
-.dock-btn.secondary:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.1); }
-.dock-btn.secondary:active { transform: scale(0.98); }
-
-/* Flat Variant (Clear) */
-.dock-btn.flat { color: #666; }
-.dock-btn.flat:hover { color: #f85149; background: rgba(248, 81, 73, 0.1); }
-
-/* Hero Button (Simulate) */
-.dock-btn-hero {
-  background: linear-gradient(135deg, #1f6feb, #00d2ff); /* Professional Blue-Cyan Gradient */
-  border: none;
-  height: 48px; padding: 0 20px 0 16px;
-  border-radius: 10px;
-  color: white;
-  display: flex; align-items: center; gap: 12px;
-  cursor: pointer;
-  position: relative; overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0, 110, 255, 0.3);
-  transition: all 0.3s;
-}
-
-.dock-btn-hero:hover {
-  filter: brightness(1.1); transform: translateY(-1px);
-  box-shadow: 0 8px 25px rgba(0, 110, 255, 0.4);
-}
-.dock-btn-hero:active { transform: translateY(0); }
-
-.dock-btn-hero.running {
-   background: #30363d; cursor: wait; color: #8b949e; box-shadow: none;
-}
-
-.dock-btn-hero .btn-content {
-  display: flex; align-items: center; gap: 12px; z-index: 2;
-}
-
-.dock-btn-hero .icon-lg { font-size: 18px; }
-
-.dock-btn-hero .text-group {
-  display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1;
-}
-
-.dock-btn-hero .btn-title { font-size: 12px; font-weight: 800; letter-spacing: 0.5px; }
-.dock-btn-hero .btn-sub { font-size: 9px; opacity: 0.8; font-weight: 500; }
-
-/* Shine Effect */
-.shine-effect {
-  position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transform: skewX(-20deg);
-  transition: 0.5s;
-}
-.dock-btn-hero:hover .shine-effect { left: 150%; transition: 0.7s; }
 
 </style>

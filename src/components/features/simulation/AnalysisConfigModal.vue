@@ -70,8 +70,9 @@
                 <!-- Independent Variable Selection -->
                 <div class="space-y-3">
                    <div class="flex-between flex-end">
-                      <label class="mini-label">
+                      <label class="mini-label" style="display: flex; align-items: center; gap: 8px;">
                          {{ selectedTemplate === 'bisection' ? 'Parameter to Optimize' : 'Independent Variables' }}
+                         <button class="help-btn" @click.prevent="showHelp = true" title="Parameter format help">?</button>
                       </label>
                       <button 
                         v-if="['multi_param', 'sobol', 'latin'].includes(selectedTemplate)" 
@@ -126,8 +127,8 @@
                           
                           <!-- Dynamic Inputs based on Template -->
                           <div v-if="['single_param', 'multi_param'].includes(selectedTemplate)">
-                             <label class="mini-label">Sampling Values (Comma Separated)</label>
-                             <input v-model="variable.sampling" placeholder="e.g. 0.1, 0.2, 0.3" class="input-mini-dark" />
+                             <label class="mini-label">Sampling Values (Array or Macro)</label>
+                             <input v-model="variable.sampling" placeholder="e.g. [0.1, 0.2] or linspace:0:1:5" class="input-mini-dark" />
                           </div>
                           
                           <div v-if="['sobol', 'latin'].includes(selectedTemplate)" class="grid-2col-tight">
@@ -264,6 +265,54 @@
       </div>
 
     </div>
+    
+    <!-- Format Help Modal -->
+    <transition name="dropdown-fade">
+      <div v-if="showHelp" class="help-overlay" @click.stop="showHelp = false">
+        <div class="help-dialog custom-scroll" @click.stop>
+          <div class="help-header">
+            <h4><span class="icon">💡</span> Parameter Formats</h4>
+            <button class="close-help-btn" @click="showHelp = false">×</button>
+          </div>
+          <div class="help-content">
+            <p class="help-intro">The following advanced formats are strictly supported when modifying parameters:</p>
+            <ul class="help-list">
+              <li>
+                <div class="hl-type">Array Parameter Initialization</div>
+                <div class="hl-desc">Assigns structural array values. Capable of enveloping sweep declarations.</div>
+                <div class="hl-code"><code>{1, 2, 3}</code></div>
+                <div class="hl-code highlight-code"><strong>Example:</strong> <code>"{1, [1,2,3], '1:2:1'}"</code> sweeps the 2nd and 3rd elements individually.</div>
+              </li>
+              <li>
+                <div class="hl-type">Parameter Sweep List</div>
+                <div class="hl-desc">Defines a finite set of simulation iterations for a scalar element.</div>
+                <div class="hl-code"><code>[1, 2, 3]</code></div>
+              </li>
+              <li>
+                <div class="hl-type">Range Iteration</div>
+                <div class="hl-desc">Sweep sequence start:stop:step.</div>
+                <div class="hl-code"><code>1:100:2</code></div>
+              </li>
+              <li>
+                <div class="hl-type">Linspace Generation</div>
+                <div class="hl-desc">Linear step distribution array.</div>
+                <div class="hl-code"><code>linspace:start:stop:samples</code></div>
+              </li>
+              <li>
+                <div class="hl-type">Random Variables</div>
+                <div class="hl-desc">Uniformly distributed random sets.</div>
+                <div class="hl-code"><code>rand:min:max:samples</code></div>
+              </li>
+              <li>
+                <div class="hl-type">File Import</div>
+                <div class="hl-desc">Extract array sweeps from a target csv/json file.</div>
+                <div class="hl-code"><code>file:path/to/data.csv</code></div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -284,6 +333,8 @@ const emit = defineEmits(['close', 'analysis-started']);
 const router = useRouter();
 const { isAuthenticated } = useAuth(); // Destructure isAuthenticated
 
+const showHelp = ref(false);
+
 const { 
   loadData, 
   componentParams,
@@ -294,9 +345,13 @@ const isSubmitting = ref(false);
 const previewPayload = ref("");
 
 function preparePreview() {
-  const payload = generatePayload();
-  previewPayload.value = JSON.stringify(payload, null, 4);
-  currentStep.value = 3;
+  try {
+      const payload = generatePayload();
+      previewPayload.value = JSON.stringify(payload, null, 4);
+      currentStep.value = 3;
+  } catch (e) {
+      alert("Validation Error: " + e.message);
+  }
 }
 
 async function confirmSubmit() {
@@ -614,17 +669,17 @@ function generatePayload() {
         const indep = analysisConfig.value.independent_variables[0];
         if (indep) {
             caseDef.independent_variable = fixParamName(indep.name); // [FIX 5]
-            caseDef.independent_variable_sampling = safeParseList(indep.sampling);
+            caseDef.independent_variable_sampling = parseUserInputValue(indep.sampling);
         }
     } else if (template === 'multi_param') {
          const indep = analysisConfig.value.independent_variables[0];
          if (indep) {
               caseDef.independent_variable = fixParamName(indep.name);
-              caseDef.independent_variable_sampling = safeParseList(indep.sampling);
+              caseDef.independent_variable_sampling = parseUserInputValue(indep.sampling);
          }
          const multiParams = {};
          analysisConfig.value.independent_variables.slice(1).forEach(v => {
-              multiParams[v.name] = safeParseList(v.sampling);
+              multiParams[v.name] = parseUserInputValue(v.sampling);
          });
          caseDef.simulation_parameters = multiParams;
     } else if (['sobol', 'latin'].includes(template)) {
@@ -664,9 +719,25 @@ function generatePayload() {
     return payload;
 }
 
-function safeParseList(str) {
-    if (!str) return [];
-    return str.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+function parseUserInputValue(str) {
+    if (typeof str !== 'string') return str;
+    const s = str.trim();
+    if (!s) return [];
+
+    if (s.startsWith('{') && s.endsWith('}')) return s;
+    if (s.startsWith('[') && s.endsWith(']')) {
+        try { return JSON.parse(s); } catch (e) { throw new Error(`Invalid JSON array format: ${s}`); }
+    }
+    const prefixes = ['linspace:', 'log:', 'rand:', 'file:'];
+    if (prefixes.some(p => s.toLowerCase().startsWith(p))) return s;
+    if (/^-?[0-9.]+:-?[0-9.]+:-?[0-9.]+$/.test(s)) return s;
+
+    if (s.includes(',')) {
+        throw new Error(`Invalid format "${s}". Please use brackets [1, 2, 3] for lists or {1, 2, 3} for array expansions.`);
+    }
+
+    if (!isNaN(Number(s))) return Number(s);
+    return s;
 }
 </script>
 
@@ -816,9 +887,10 @@ function safeParseList(str) {
 .count-badge { background: #00d2ff; color: #000; padding: 2px 6px; border-radius: 8px; font-size: 9px; margin-left: 8px; }
 
 /* Preview Styles */
+.preview-box { background: #05070a; border: 1px solid #30363d; border-radius: 4px; padding: 10px; max-height: 400px; overflow: auto; }
+.json-preview { margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #c9d1d9; white-space: pre-wrap; }
 .full-height { height: 100%; display: flex; flex-direction: column; }
-.preview-box { flex: 1; overflow: hidden; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 10px; }
-.json-preview { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #c9d1d9; margin: 0; white-space: pre-wrap; overflow-y: auto; height: 100%; }
+.full-height .preview-box { flex: 1; }
 
 /* Wizard Styles */
 .header-left { display: flex; align-items: center; gap: 15px; }
@@ -891,4 +963,28 @@ function safeParseList(str) {
 
 .fade-in { animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.help-btn { background: rgba(0, 210, 255, 0.1); border: 1px solid rgba(0, 210, 255, 0.3); color: #00d2ff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; cursor: pointer; flex-shrink: 0; transition: all 0.2s; padding: 0;}
+.help-btn:hover { background: rgba(0, 210, 255, 0.3); color: #fff; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+
+/* Format Help Modal Styles */
+.help-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 20, 0.85); backdrop-filter: blur(5px); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box; }
+.help-dialog { background: #1a1f28; border: 1px solid #00d2ff; border-radius: 10px; width: 100%; max-width: 400px; max-height: 100%; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; margin: auto; }
+.help-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(0, 210, 255, 0.2); background: rgba(0, 210, 255, 0.05); }
+.help-header h4 { margin: 0; color: #00d2ff; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.close-help-btn { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; transition: color 0.2s; }
+.close-help-btn:hover { color: #ff5252; }
+.help-content { padding: 15px; }
+.help-intro { font-size: 11px; color: #aaa; margin: 0 0 15px 0; line-height: 1.4; text-align: left;}
+.help-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 15px; text-align: left;}
+.help-list li { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 6px; }
+.hl-type { font-size: 12px; font-weight: bold; color: #00d2ff; margin-bottom: 4px; }
+.hl-desc { font-size: 11px; color: #888; margin-bottom: 8px; }
+.hl-code { font-size: 11px; font-family: "Consolas", monospace; background: rgba(0, 0, 0, 0.4); padding: 6px 8px; border-radius: 4px; border: 1px solid #333; color: #eee; }
+.hl-code code { color: #ffca28; font-weight: bold; }
+.hl-code.highlight-code { margin-top: 6px; border-left: 3px solid #ffca28; background: rgba(255, 202, 40, 0.05); color: #ccc; }
+
+.dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-10px); }
+.dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: all 0.2s ease; }
+
 </style>
