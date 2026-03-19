@@ -1,56 +1,65 @@
 # Tricys Visual
 
-**Tritium Integrated Cycle Simulation (TRICYS) - Visualization Frontend**
+> **Tritium Integrated Cycle Simulation (TRICYS) - Visualization Frontend**
 
-`tricys_visual` is the Vue 3-based frontend for the TRICYS platform, providing real-time simulation monitoring, 3D visualization, and result analysis.
+`tricys_visual` is the modern, high-performance Vue 3-based frontend for the TRICYS platform, providing real-time simulation monitoring, dynamic 3D visualizations, and comprehensive result analysis.
 
-## Features
+## Core Features
 
-- **3D Visualization**: Interactive digital twin visualization using Three.js.
-- **Real-time Monitoring**: Live tracking of simulation KPIs and process status.
-- **Component Editor**: Visual editor for Modelica component parameters and connections.
-- **Result Analysis**: Integrated file browser and visualizers for HDF5, Markdown, and other result formats.
-- **GoView Integration**: Seamless embedding with the GoView low-code visualization platform.
+- **📊 Real-time Monitoring**: Live tracking of simulation KPIs, process status, and log streams via WebSockets.
+- **🌐 3D Digital Twin Visualization**: Interactive digital twin visualization integrated with Three.js.
+- **🛠️ Component Editor**: Visual editor for configuring Modelica component parameters and network connections.
+- **📈 Result Analysis**: Integrated HDF5 viewer, Markdown report rendering, and other post-simulation visualizers.
+- **🔗 GoView Integration**: Seamless embedding with the GoView low-code data visualization platform for advanced dashboarding.
 
 ## Project Architecture
 
-The project follows a feature-based architecture:
+Built with modern web technologies:
+- **Framework**: [Vue 3](https://vuejs.org/) (Composition API)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Routing**: Vue Router
 
-```
+```text
 src/
-├── api/            # API client and service modules
-├── components/     # Vue components
-│   ├── common/     # Shared UI components (Buttons, Modals)
-│   ├── layout/     # Structural components (Header, Sidebar)
-│   └── features/   # Feature-specific components (Simulation, Monitor, Result)
-├── composables/    # Vue Composition API hooks
-├── layouts/        # Page layouts
+├── api/            # API client and backend service wrappers
+├── components/     # Reusable Vue components (Common, Layout, Features)
+├── composables/    # Vue 3 Composition API hooks
+├── layouts/        # Global page layouts
 ├── router/         # Vue Router configuration
-├── styles/         # Global styles and themes
-├── utils/          # Helper functions
-└── views/          # Top-level page views
+├── styles/         # Global styles and design system
+├── utils/          # Helper functions and utilities
+└── views/          # Top-level route pages
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v16+)
-- npm or yarn
+- Node.js (v16.0 or higher recommended)
+- npm, yarn, or pnpm
 
 ### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/asipp-neutronics/tricys.git
+cd tricys/tricys_visual
+
+# Install dependencies
 npm install
 ```
 
-### Development
+### Development Server
+
+Start the local development server with Hot Module Replacement (HMR):
 
 ```bash
 npm run dev
 ```
 
-### Build
+### Production Build
+
+Compile and minify for production:
 
 ```bash
 npm run build
@@ -58,11 +67,11 @@ npm run build
 
 ## Configuration
 
-Environment variables can be set in `.env` files:
+Environment variables can be configured via `.env` files (e.g., `.env.local`):
 
 - `VITE_API_URL`: Backend API URL (default: `http://localhost:8000/api/v1`)
-- `VITE_GOVIEW_URL`: URL for the GoView instance
+- `VITE_GOVIEW_URL`: URL for your GoView visualization instance
 
 ## License
 
-[APACHE 2.0](LICENSE)
+This project is licensed under the [APACHE 2.0](LICENSE) License.
