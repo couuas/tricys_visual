@@ -59,6 +59,12 @@ const router = createRouter({
           name: 'goview',
           component: () => import('../views/GoviewView.vue'),
           meta: { requiresAuth: true }
+        },
+        {
+          path: 'visualizer',
+          name: 'visualizer',
+          component: () => import('../views/Hdf5VisualizerView.vue'),
+          meta: { requiresAuth: true }
         }
       ]
     },
@@ -120,7 +126,7 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // Project Context Guard
-    const projectPages = ['config', 'monitor', 'component-detail', 'goview'];
+    const projectPages = ['config', 'monitor', 'component-detail', 'goview', 'visualizer'];
 
     // Demo mode exception: 'config' route is used for demo but with separate name/path logic? 
     // Actually 'demo' route has name='demo'. 'config' route has name='config'. 

@@ -145,6 +145,7 @@ import { useSimulation } from '../composables/useSimulation';
 import { $confirm } from '../utils/dialog';
 import { $notify } from '../utils/notification'; 
 import { projectApi } from '../api/project'; 
+import { resolveBackendBase } from '../utils/runtimeUrls';
 
 const props = defineProps(['id']);
 const router = useRouter();
@@ -163,7 +164,7 @@ const isReady = ref(false);
 // [MODIFIED] Default is View Mode (false)
 const isEditMode = ref(false);
 const markdownCache = ref({});
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = resolveBackendBase();
 
 onMounted(async () => {
   // Ensure we have project ID (rescue from route or localStorage if needed)

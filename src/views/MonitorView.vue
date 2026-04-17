@@ -53,6 +53,7 @@ import { taskApi } from '../api/task';
 import { projectApi } from '../api/project';
 import { useAuth } from '../composables/useAuth';
 import { useSimulation } from '../composables/useSimulation';
+import { resolveApiBase as getRuntimeApiBase } from '../utils/runtimeUrls';
 
 const router = useRouter();
 const route = useRoute();
@@ -219,12 +220,7 @@ const fetchTaskLogs = async (id) => {
 };
 
 const resolveApiBase = () => {
-  const envBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-  const trimmed = envBase.replace(/\/+$/, '');
-  if (/\/api\/v1$/.test(trimmed)) {
-    return trimmed;
-  }
-  return `${trimmed}/api/v1`;
+  return getRuntimeApiBase();
 };
 
 const connectWS = (id) => {

@@ -1,9 +1,8 @@
 import axios from 'axios';
 import { triggerAuthExpired } from '../utils/authEvents';
+import { resolveApiBase } from '../utils/runtimeUrls';
 
-// Create a configured axios instance
-// Basic configuration assuming backend is on localhost:8000 by default if no env var
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const baseURL = resolveApiBase();
 
 const apiClient = axios.create({
   baseURL,

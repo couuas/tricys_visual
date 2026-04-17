@@ -144,6 +144,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { useSimulation } from '../../../composables/useSimulation';
 import { useRouter } from 'vue-router';
+import { resolveBackendBase } from '../../../utils/runtimeUrls';
 
 const props = defineProps({
     isSimulating: { type: Boolean, default: false }
@@ -235,8 +236,7 @@ const GRID_SNAP = 10;
 const CUSTOM_LOAD_DISTANCE = 900;
 const MAX_CONCURRENT_CUSTOM_LOADS = 2;
 const LOAD_TIMEOUT_MS = 20000;
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-const BACKEND_URL = API_BASE.replace(/\/api\/v1\/?$/, '');
+const BACKEND_URL = resolveBackendBase();
 
 const hoverInfo = reactive({ visible: false, x: 0, y: 0, id: '', type: '', value: 0, note: '', params: [], alertRule: null });
 
@@ -1896,7 +1896,7 @@ defineExpose({ reloadComponent });
 .toolbar-select { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); color: #e0f7ff; font-size: 11px; border-radius: 4px; padding: 3px 6px; max-width: 160px; }
 .toolbar-select:disabled { opacity: 0.4; }
 .toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.load-progress { position: absolute; bottom: 12px; right: 12px; z-index: 60; width: 260px; background: rgba(5, 10, 15, 0.8); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 8px; padding: 8px 10px; backdrop-filter: blur(6px); }
+.load-progress { position: absolute; bottom: 12px; left: 12px; z-index: 60; width: 260px; background: rgba(5, 10, 15, 0.8); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 8px; padding: 8px 10px; backdrop-filter: blur(6px); }
 .load-progress-title { font-size: 10px; color: #6fbfe0; letter-spacing: 1px; text-align: center; }
 .load-progress-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .load-progress-item { display: grid; grid-template-columns: 1fr; gap: 4px; }

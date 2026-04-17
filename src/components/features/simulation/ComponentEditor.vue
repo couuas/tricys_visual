@@ -237,6 +237,7 @@ import { useSimulation } from '../../../composables/useSimulation';
 import { useAuth } from '../../../composables/useAuth';
 import { $confirm } from '../../../utils/dialog';
 import { $notify } from '../../../utils/notification'; 
+import { resolveBackendBase } from '../../../utils/runtimeUrls';
 
 const props = defineProps(['selectedId', 'embedded', 'allowClose']);
 const emit = defineEmits(['close', 'update', 'close-panel']);
@@ -269,9 +270,7 @@ const originalFilter = ref({ min: '', max: '' });
 const isUploading = ref(false);
 const fileInput = ref(null);
 const selectedModelUrl = ref('');
-// Base URL for static assets (remove /api/v1 if it exists in env, we want the root)
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-const BACKEND_URL = API_BASE.replace(/\/api\/v1\/?$/, ''); 
+const BACKEND_URL = resolveBackendBase(); 
 
 const showModelDropdown = ref(false);
 const modelSelectorRef = ref(null);

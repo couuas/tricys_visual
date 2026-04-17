@@ -1,16 +1,9 @@
 import axios from 'axios';
 import { triggerAuthExpired } from '../utils/authEvents';
-
-const resolveGoviewBase = () => {
-  const v2 = import.meta.env.VITE_API_V2_URL;
-  if (v2) return v2;
-  const v1 = import.meta.env.VITE_API_URL;
-  if (v1) return v1.replace(/\/api\/v1\/?$/, '/api/v2/goview');
-  return 'http://localhost:8000/api/v2/goview';
-};
+import { resolveApiV2Base } from '../utils/runtimeUrls';
 
 const goviewClient = axios.create({
-  baseURL: resolveGoviewBase(),
+  baseURL: resolveApiV2Base(),
   headers: {
     'Content-Type': 'application/json'
   }

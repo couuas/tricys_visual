@@ -2,6 +2,7 @@ import { ref, reactive, computed } from 'vue';
 import { projectApi } from '../api/project';
 import { taskApi } from '../api/task';
 import { useAuth } from './useAuth';
+import { resolveApiBase, resolveBackendBase } from '../utils/runtimeUrls';
 
 // --- 全局单例状态 (Global State) ---
 const isReadOnly = ref(false);
@@ -470,8 +471,8 @@ export function useSimulation() {
     pause(); hasSimulationData.value = false; simulationData.value = null; currentTime.value = 0; showLabels.value = true; lastSimConfig.value = null; activeAlert.value = null; ignoredComponents.clear(); updateDashboardVisibility();
   };
   /* Fixed BACKEND_URL def */
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-  const BACKEND_URL = API_BASE.replace(/\/api\/v1\/?$/, '');
+  const API_BASE = resolveApiBase();
+  const BACKEND_URL = resolveBackendBase();
   const fetchLibraryModels = async () => { try { const res = await fetch(`${BACKEND_URL}/api/v1/library/models`); if (res.ok) libraryModels.value = await res.json(); } catch (e) { console.error('Failed to fetch library models:', e); } };
   const updateDashboardVisibility = () => { if (!hasSimulationData.value) { showDashboard.value = false; return; } const width = window.innerWidth; if (width < 800) showDashboard.value = false; else showDashboard.value = userPrefersDashboard.value; };
   const toggleDashboardPref = (val) => { userPrefersDashboard.value = val; showDashboard.value = val; };

@@ -2,7 +2,6 @@
   <header class="top-bar">
     <!-- Left: Brand -->
     <div class="brand-area">
-      <div class="logo-mark">⚛</div>
       <div class="logo-type">
         TRICYS<span class="highlight">VIS</span>
         <span class="platform-name">Visualization of TRitium Integrated CYcle Simulation</span>
@@ -66,7 +65,7 @@ const projectLabel = computed(() => {
   background: linear-gradient(180deg, rgba(11, 16, 23, 0.98) 0%, rgba(8, 12, 18, 0.94) 100%);
   border-bottom: 1px solid var(--shell-border-strong);
   display: flex; justify-content: space-between; align-items: center;
-  padding: 0 24px 0 28px;
+  padding: 0 10px 0 10px;
   z-index: 500;
   font-family: var(--shell-nav-font);
   box-sizing: border-box;

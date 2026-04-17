@@ -22,24 +22,17 @@
             <div class="info-row"><span>Path</span><span>{{ selectedFile?.path || '-' }}</span></div>
             <div class="info-row"><span>Size</span><span>{{ selectedFile?.size ?? '-' }}</span></div>
             <div class="info-row"><span>Type</span><span>{{ selectedFile?.name?.split('.').pop() || '-' }}</span></div>
-            <div class="info-row" v-if="hdf5Status.running">
+            <div class="info-row" v-if="selectedFile && isH5File(selectedFile?.name)">
               <span>HDF5 Visualizer</span>
-              <span>Running (PID {{ hdf5Status.pid }})</span>
-            </div>
-            <div class="info-row" v-if="hdf5Status.running">
-              <span>Started</span>
-              <span>{{ formatStartedAt(hdf5Status.started_at) }}</span>
-            </div>
-            <div class="hint" v-if="hdf5Status.running">
-              Auto-stop in 10 minutes. Status refreshes automatically.
+              <span>Available in-app</span>
             </div>
           </div>
 
           <div class="preview-section preview-section-text">
             <div class="section-title">TEXT PREVIEW</div>
             <div v-if="selectedFile && isH5File(selectedFile?.name)" class="empty">
-              Double-click the .h5 file to launch Tricys HDF5 Visualizer.
-              <div v-if="hdf5Launching" class="hint">Waiting for visualizer to open…</div>
+              Double-click the .h5 file to open the in-app HDF5 visualizer.
+              <div v-if="hdf5Launching" class="hint">Opening visualizer…</div>
             </div>
             <div class="preview-body" v-else-if="isSvgFile(selectedFile?.name) && fileContent">
               <img :src="svgDataUrl" class="svg-preview" alt="SVG Preview" />
@@ -64,6 +57,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { taskApi } from '../../../api/task';
 import { visualizerApi } from '../../../api/visualizer';
 import ResultFileBrowser from './ResultFileBrowser.vue';
@@ -76,6 +70,9 @@ const props = defineProps({
   taskName: { type: String, default: 'Task Result' }
 });
 
+const router = useRouter();
+const route = useRoute();
+
 defineEmits(['back']);
 
 const fileList = ref([]);
@@ -83,20 +80,9 @@ const selectedFile = ref(null);
 const fileContent = ref('');
 const fileTruncated = ref(false);
 const hdf5Launching = ref(false);
-const hdf5Status = ref({ running: false });
 let hdf5NotifyId = null;
-let statusTimer = null;
 const markdownRef = ref(null);
 const imageObjectUrls = new Set();
-
-const formatStartedAt = (ts) => {
-  if (!ts) return '-';
-  try {
-    return new Date(ts * 1000).toLocaleString();
-  } catch {
-    return '-';
-  }
-};
 
 const loadFileList = async (id) => {
   try {
@@ -209,21 +195,31 @@ const handleOpenHdf5 = async (file) => {
     if (hdf5NotifyId) closeNotification(hdf5NotifyId);
     const notifyId = $notify({
       title: 'HDF5 Visualizer',
-      message: 'Launching, please wait…',
+      message: 'Opening, please wait…',
       type: 'process',
       duration: 0
     });
     hdf5NotifyId = notifyId;
-    await visualizerApi.openHdf5(props.taskId, { path: file.path });
-    const status = await visualizerApi.getHdf5Status(props.taskId);
-    hdf5Status.value = status || { running: false };
-    $updateNotification(notifyId, { message: hdf5Status.value.running ? 'Started successfully.' : 'Failed to start.' });
-    setTimeout(() => closeNotification(notifyId), hdf5Status.value.running ? 1500 : 2000);
+    const response = await visualizerApi.openHdf5(props.taskId, { path: file.path });
+    if (response?.viewer_path) {
+      router.push(response.viewer_path);
+    } else {
+      router.push({
+        name: 'visualizer',
+        query: {
+          projectId: route.query.projectId,
+          taskId: props.taskId,
+          path: file.path,
+          token: response?.token,
+        },
+      });
+    }
+    $updateNotification(notifyId, { message: 'Opened successfully.' });
+    setTimeout(() => closeNotification(notifyId), 1200);
     hdf5NotifyId = null;
   } catch {
-    hdf5Status.value = { running: false };
     if (hdf5NotifyId) {
-      $updateNotification(hdf5NotifyId, { message: 'Failed to start.' });
+      $updateNotification(hdf5NotifyId, { message: 'Failed to open.' });
       setTimeout(() => closeNotification(hdf5NotifyId), 2000);
       hdf5NotifyId = null;
     }
@@ -232,23 +228,11 @@ const handleOpenHdf5 = async (file) => {
   }
 };
 
-const startStatusRefresh = () => {
-    if (statusTimer) clearInterval(statusTimer);
-    statusTimer = setInterval(async () => {
-        try {
-            const status = await visualizerApi.getHdf5Status(props.taskId);
-            hdf5Status.value = status || { running: false };
-        } catch { hdf5Status.value = { running: false }; }
-    }, 5000);
-};
-
 onMounted(() => {
   loadFileList(props.taskId);
-  startStatusRefresh();
 });
 
 onUnmounted(() => {
-  if (statusTimer) clearInterval(statusTimer);
   if (hdf5NotifyId) closeNotification(hdf5NotifyId);
   clearImageObjectUrls();
 });
@@ -257,7 +241,6 @@ watch(() => props.taskId, (newId) => {
     loadFileList(newId);
     fileContent.value = '';
     selectedFile.value = null;
-    startStatusRefresh();
 });
 
 watch(renderedMarkdown, async () => {

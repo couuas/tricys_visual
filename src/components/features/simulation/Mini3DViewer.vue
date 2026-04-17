@@ -7,15 +7,14 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { resolveBackendBase } from '../../../utils/runtimeUrls';
 
 const props = defineProps(['modelUrl']);
 const container = ref(null);
 
 let scene, camera, renderer, controls, reqId;
 
-// Dynamic Backend URL
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-const BACKEND_URL = API_BASE.replace(/\/api\/v1\/?$/, '');
+const BACKEND_URL = resolveBackendBase();
 
 // Race condition handling
 let loadRequestId = 0;

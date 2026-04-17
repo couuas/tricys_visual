@@ -219,6 +219,7 @@ import ComponentEditor from '../components/features/simulation/ComponentEditor.v
 import ConnectionEditor from '../components/features/simulation/ConnectionEditor.vue';
 import SimulationConfigModal from '../components/features/simulation/SimulationConfigModal.vue'; 
 import AnalysisConfigModal from '../components/features/simulation/AnalysisConfigModal.vue'; // [NEW]
+import { resolveBackendBase } from '../utils/runtimeUrls';
 
 const props = defineProps({ mode: { type: String, default: 'normal' } });
 const router = useRouter();
@@ -246,7 +247,7 @@ const showAnalysisModal = ref(false); // [NEW]
 const showSettingsMenu = ref(false);
 const showUploadOverlay = ref(false);
 const isReady = ref(false);
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = resolveBackendBase();
 
 
 

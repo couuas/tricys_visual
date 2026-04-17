@@ -110,12 +110,11 @@
         <table class="dash-table compact">
           <thead>
             <tr>
-              <th style="width: 30%">TASK INFO</th>
+              <th style="width: 40%">TASK INFO</th>
               <th style="width: 15%">CREATED AT</th>
-              <th style="width: 10%">TYPE</th>
-              <th style="width: 10%">STATUS</th>
-              <th style="width: 10%; text-align: center">RESULTS</th>
-              <th style="width: 25%">VISUALIZER</th>
+              <th style="width: 15%">TYPE</th>
+              <th style="width: 15%">STATUS</th>
+              <th style="width: 15%; text-align: center">RESULTS</th>
             </tr>
           </thead>
           <tbody>
@@ -155,26 +154,6 @@
                  </div>
               </td>
 
-              <!-- Visualizer Info & Actions -->
-              <td>
-                 <div v-if="getActiveProc(task.id)" class="vis-active-container">
-                     <div class="vis-status">
-                        <span class="vis-dot"></span>
-                        <span class="vis-text">Running (PID {{ getActiveProc(task.id).pid }})</span>
-                     </div>
-                     <div class="vis-actions">
-                        <button class="icon-btn success small" @click.stop="openProcess(getActiveProc(task.id).port)" title="Open Visualizer">
-                            🔗 OPEN
-                        </button>
-                         <button class="icon-btn danger small" @click.stop="killProcess(task.id)" title="Stop Visualizer">
-                            ⏹ STOP
-                        </button>
-                     </div>
-                 </div>
-                 <div v-else class="vis-inactive">
-                     <span class="vis-text-mute">-</span>
-                 </div>
-              </td>
             </tr>
             <tr v-if="filteredTasks.length === 0">
                <td colspan="7" class="empty-cell">No matching tasks found</td>

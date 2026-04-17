@@ -36,6 +36,7 @@ import { goviewApi } from '../api/goview.js';
 import { $notify } from '../utils/notification';
 import { useAuth } from '../composables/useAuth';
 import { useSimulation } from '../composables/useSimulation';
+import { resolveApiV2Base, resolveGoviewBase } from '../utils/runtimeUrls';
 
 const route = useRoute();
 const router = useRouter();
@@ -43,6 +44,7 @@ const { currentUser } = useAuth();
 const { loadData } = useSimulation();
 const iframeRef = ref(null);
 const isLoading = ref(true);
+const iframeReady = ref(false);
 const previewBlocked = ref(false);
 const isForking = ref(false);
 
@@ -50,29 +52,30 @@ const projectId = computed(() => route.query.projectId || localStorage.getItem('
 const goviewProjectId = ref(null);
 const token = localStorage.getItem('tricys_auth_token');
 
-const apiBase = computed(() => {
-  const v2 = import.meta.env.VITE_API_V2_URL;
-  if (v2) return v2;
-  const v1 = import.meta.env.VITE_API_URL;
-  if (v1) return v1.replace(/\/api\/v1\/?$/, '/api/v2/goview');
-  return 'http://localhost:8000/api/v2/goview';
-});
+const apiBase = computed(() => resolveApiV2Base());
 
-const goviewBase = computed(() => import.meta.env.VITE_GOVIEW_URL || 'http://localhost:3020/');
+const goviewBase = computed(() => resolveGoviewBase());
 
 const iframeSrc = computed(() => {
   try {
-    const baseUrl = goviewBase.value.replace(/\/$/, '');
-    if (!goviewProjectId.value) return baseUrl;
+    const baseUrl = goviewBase.value.endsWith('/') ? goviewBase.value : `${goviewBase.value}/`;
+    const currentHref = typeof window !== 'undefined' ? window.location.href : 'http://localhost:8080/';
+    const url = new URL(baseUrl, currentHref);
 
-    const url = new URL(baseUrl);
+    if (!goviewProjectId.value) {
+      return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` || url.pathname : url.toString();
+    }
+
     url.searchParams.set('apiBase', apiBase.value);
     if (token) url.searchParams.set('token', token);
     url.searchParams.set('projectId', String(goviewProjectId.value));
 
     const encodedId = encodeURIComponent(String(goviewProjectId.value));
     url.hash = `/chart/home/${encodedId}`;
-    return url.toString();
+
+    return url.origin === window.location.origin
+      ? `${url.pathname}${url.search}${url.hash}`
+      : url.toString();
   } catch (e) {
     return goviewBase.value;
   }
@@ -80,14 +83,39 @@ const iframeSrc = computed(() => {
 
 const getTargetOrigin = () => {
   try {
-    return new URL(goviewBase.value).origin;
+    return new URL(
+      iframeSrc.value || goviewBase.value,
+      typeof window !== 'undefined' ? window.location.href : 'http://localhost:8080/'
+    ).origin;
   } catch (e) {
     return '*';
   }
 };
 
+const getRecipientOrigin = () => {
+  try {
+    const recipientOrigin = iframeRef.value?.contentWindow?.location?.origin;
+    if (!recipientOrigin || recipientOrigin === 'null') {
+      return null;
+    }
+    return recipientOrigin;
+  } catch (e) {
+    return null;
+  }
+};
+
 const sendContext = () => {
+  if (!goviewProjectId.value || !iframeRef.value?.contentWindow || !iframeReady.value) {
+    return;
+  }
+
   const targetOrigin = getTargetOrigin();
+  const recipientOrigin = getRecipientOrigin();
+
+  if (targetOrigin !== '*' && recipientOrigin !== targetOrigin) {
+    return;
+  }
+
   const payload = {
     type: 'TRICYS_CTX',
     payload: {
@@ -96,7 +124,12 @@ const sendContext = () => {
       apiBase: apiBase.value
     }
   };
-  iframeRef.value?.contentWindow?.postMessage(payload, targetOrigin);
+
+  try {
+    iframeRef.value.contentWindow.postMessage(payload, targetOrigin);
+  } catch (error) {
+    console.warn('Failed to post GoView context', error);
+  }
 };
 
 const requireAuth = () => {
@@ -112,7 +145,10 @@ const requireAuth = () => {
 
 const handleLoad = () => {
   isLoading.value = false;
-  sendContext();
+  iframeReady.value = getRecipientOrigin() === getTargetOrigin();
+  if (iframeReady.value) {
+    sendContext();
+  }
 };
 
 const handleMessage = (event) => {
@@ -122,6 +158,7 @@ const handleMessage = (event) => {
 
   if (event.data.type === 'GOVIEW_READY') {
     isLoading.value = false;
+    iframeReady.value = true;
     sendContext();
   }
 
@@ -225,7 +262,6 @@ onMounted(async () => {
       await loadData(projectId.value);
   }
   await resolveGoviewProjectId();
-  sendContext();
 });
 
 onBeforeUnmount(() => {
@@ -233,17 +269,24 @@ onBeforeUnmount(() => {
 });
 
 watch(projectId, async () => {
+  iframeReady.value = false;
+  isLoading.value = true;
   await resolveGoviewProjectId();
-  sendContext();
 });
 
 watch(
   () => route.query.goviewProjectId || route.query.goviewId,
   async () => {
+    iframeReady.value = false;
+    isLoading.value = true;
     await resolveGoviewProjectId();
-    sendContext();
   }
 );
+
+watch(iframeSrc, () => {
+  iframeReady.value = false;
+  isLoading.value = true;
+});
 </script>
 
 <style scoped>

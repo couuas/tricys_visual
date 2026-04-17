@@ -1,8 +1,8 @@
 import apiClient from './client';
 
 export const visualizerApi = {
-  getMetadata: async (taskId) => {
-    return await apiClient.get(`/tasks/${taskId}/visualizer/metadata`);
+  getMetadata: async (taskId, params) => {
+    return await apiClient.get(`/tasks/${taskId}/visualizer/metadata`, { params });
   },
   getJobs: async (taskId, params) => {
     return await apiClient.get(`/tasks/${taskId}/visualizer/jobs`, { params });
@@ -13,11 +13,11 @@ export const visualizerApi = {
   getMetrics: async (taskId, params) => {
     return await apiClient.get(`/tasks/${taskId}/visualizer/metrics`, { params });
   },
-  getConfig: async (taskId) => {
-    return await apiClient.get(`/tasks/${taskId}/visualizer/config`);
+  getConfig: async (taskId, params) => {
+    return await apiClient.get(`/tasks/${taskId}/visualizer/config`, { params });
   },
-  getLog: async (taskId) => {
-    return await apiClient.get(`/tasks/${taskId}/visualizer/log`);
+  getLog: async (taskId, params) => {
+    return await apiClient.get(`/tasks/${taskId}/visualizer/log`, { params });
   },
   exportData: async (taskId, payload) => {
     return await apiClient.post(`/tasks/${taskId}/visualizer/export`, payload);
