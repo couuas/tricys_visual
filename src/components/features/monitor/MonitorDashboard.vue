@@ -100,8 +100,8 @@
            <!-- Visualizer Filter -->
            <div class="filter-group">
                <label class="checkbox-label">
-                   <input type="checkbox" v-model="filters.onlyVisualizer">
-                   <span>HDF5 Running</span>
+                   <input type="checkbox" v-model="filters.onlyFoc">
+                   <span>FOC Filter</span>
                </label>
            </div>
         </div>
@@ -110,15 +110,17 @@
         <table class="dash-table compact">
           <thead>
             <tr>
-              <th style="width: 40%">TASK INFO</th>
+              <th style="width: 34%">TASK INFO</th>
               <th style="width: 15%">CREATED AT</th>
-              <th style="width: 15%">TYPE</th>
-              <th style="width: 15%">STATUS</th>
+              <th style="width: 12%">TYPE</th>
+              <th style="width: 12%">STATUS</th>
+              <th style="width: 12%">FOC STATUS</th>
               <th style="width: 15%; text-align: center">RESULTS</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="task in filteredTasks" :key="task.id" @click="$emit('view-task', task.id)" class="task-row">
+            <template v-for="task in filteredTasks" :key="task.id">
+            <tr @click="$emit('view-task', task.id)" class="task-row">
               <!-- Task Info -->
               <td>
                 <div class="cell-group">
@@ -145,6 +147,18 @@
                  <span class="status-badge" :class="task.status.toLowerCase()">{{ task.status }}</span>
               </td>
 
+                <!-- FOC Status -->
+                <td>
+                  <button
+                    v-if="hasFoc(task)"
+                    class="foc-status-badge enabled foc-preview-trigger"
+                    @click.stop="toggleFocPreview(task.id)"
+                  >
+                    {{ expandedFocTaskId === task.id ? 'HIDE PREVIEW' : 'SHOW PREVIEW' }}
+                  </button>
+                  <span v-else class="foc-status-badge disabled">NONE</span>
+                </td>
+
               <!-- Results -->
               <td class="col-action" style="text-align: center">
                  <div class="action-group" style="justify-content: center">
@@ -155,6 +169,12 @@
               </td>
 
             </tr>
+            <tr v-if="expandedFocTaskId === task.id && hasFoc(task)" class="foc-preview-row">
+              <td colspan="6">
+                <TaskFocPreview :task="task" :active="expandedFocTaskId === task.id" />
+              </td>
+            </tr>
+            </template>
             <tr v-if="filteredTasks.length === 0">
                <td colspan="7" class="empty-cell">No matching tasks found</td>
             </tr>
@@ -169,9 +189,11 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
 import KPICard from './KPICard.vue';
+import TaskFocPreview from '../simulation/TaskFocPreview.vue';
 import * as echarts from 'echarts';
 import { visualizerApi } from '../../../api/visualizer';
 import { $notify } from '../../../utils/notification';
+import { getTaskFocConfig, hasTaskFoc } from '../../../utils/taskFoc';
 
 const props = defineProps({
   tasks: { type: Array, default: () => [] }
@@ -201,10 +223,11 @@ const recentTasks = ref([]);
 const filters = ref({
     type: 'ALL',
     status: 'ALL',
-    onlyVisualizer: false
+  onlyFoc: false
 });
 const showOverview = ref(true);
 const processes = ref([]);
+const expandedFocTaskId = ref(null);
 
 const loadingProcs = ref(false);
 
@@ -231,6 +254,12 @@ const getActiveProc = (taskId) => {
     return processes.value.find(p => p.task_id === taskId);
 };
 
+const hasFoc = (task) => hasTaskFoc(task);
+
+const toggleFocPreview = (taskId) => {
+  expandedFocTaskId.value = expandedFocTaskId.value === taskId ? null : taskId;
+};
+
 // Filter Logic
 const filteredTasks = computed(() => {
     let result = [...props.tasks];
@@ -249,9 +278,9 @@ const filteredTasks = computed(() => {
         }
     }
 
-    // 3. Filter Visualizer
-    if (filters.value.onlyVisualizer) {
-        result = result.filter(t => getActiveProc(t.id));
+    // 3. Filter FOC
+    if (filters.value.onlyFoc) {
+      result = result.filter(t => hasFoc(t));
     }
 
     // Sort by date desc
@@ -617,6 +646,11 @@ watch(() => props.tasks, calculateStats, { deep: true });
 .status-badge.running { background: rgba(0, 210, 255, 0.1); color: #00d2ff; border: 1px solid rgba(0, 210, 255, 0.2); box-shadow: 0 0 5px rgba(0,210,255,0.2); }
 .status-badge.stopped { background: rgba(255,255,255,0.1); color: #aaa; border: 1px solid rgba(255,255,255,0.2); }
 .status-badge.pending { background: rgba(255,255,0,0.1); color: #ffca28; border: 1px solid rgba(255,255,0,0.2); }
+.foc-status-badge { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; display: inline-block; width: fit-content; }
+.foc-status-badge.enabled { background: rgba(34, 211, 238, 0.12); color: #67e8f9; border: 1px solid rgba(34, 211, 238, 0.3); }
+.foc-status-badge.disabled { background: rgba(148, 163, 184, 0.08); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); }
+.foc-preview-trigger { cursor: pointer; transition: 0.2s; }
+.foc-preview-trigger:hover { background: rgba(34, 211, 238, 0.2); color: #cffafe; }
 
 .type-stats .type-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; width: fit-content; }
 .time-main { color: #ccc; font-weight: 500; }
@@ -652,6 +686,7 @@ watch(() => props.tasks, calculateStats, { deep: true });
 .icon-btn.small { padding: 2px 6px; font-size: 9px; }
 
 .empty-cell { text-align: center; padding: 30px; color: #555; font-style: italic; }
+.foc-preview-row td { padding: 0; background: #0a0f15; border-bottom: 1px solid rgba(255,255,255,0.02); }
 
 .custom-scroll::-webkit-scrollbar { width: 6px; }
 .custom-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }

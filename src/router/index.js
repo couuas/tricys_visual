@@ -31,6 +31,11 @@ const router = createRouter({
           component: () => import('../views/MonitorView.vue')
         },
         {
+          path: 'analysis',
+          name: 'analysis',
+          component: () => import('../views/AgentView.vue')
+        },
+        {
           path: 'demo',
           name: 'demo',
           component: () => import('../views/ConfigView.vue'),
@@ -40,6 +45,11 @@ const router = createRouter({
           path: 'user',
           name: 'user',
           component: () => import('../views/UserView.vue')
+        },
+        {
+          path: 'projects',
+          name: 'projects',
+          component: () => import('../views/ProjectsView.vue')
         },
         {
           path: 'help',
@@ -126,7 +136,7 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // Project Context Guard
-    const projectPages = ['config', 'monitor', 'component-detail', 'goview', 'visualizer'];
+    const projectPages = ['config', 'analysis', 'monitor', 'component-detail', 'goview', 'visualizer'];
 
     // Demo mode exception: 'config' route is used for demo but with separate name/path logic? 
     // Actually 'demo' route has name='demo'. 'config' route has name='config'. 
@@ -142,7 +152,7 @@ router.beforeEach(async (to, from, next) => {
         } else {
           // Strict block
           $notify({ title: 'NO PROJECT SELECTED', message: 'Please select a project to proceed.', type: 'warn' });
-          next({ name: 'user' }); // Go to dashboard to select
+          next({ name: 'projects' });
         }
       } else {
         next();

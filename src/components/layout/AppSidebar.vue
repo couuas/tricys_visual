@@ -15,6 +15,17 @@
 
       <div 
         class="sidebar-item" 
+        :class="{ active: currentRouteName === 'analysis' }"
+        @click="navigateTo('analysis')"
+        title="Agent"
+      >
+        <span class="icon">🧠</span>
+        <span class="label-mini" v-show="!isExpanded">AGT</span>
+        <span class="label-full" v-show="isExpanded">Agent</span>
+      </div>
+
+      <div 
+        class="sidebar-item" 
         :class="{ active: currentRouteName === 'monitor' }"
         @click="navigateTo('monitor')"
         title="Monitor"
@@ -51,8 +62,18 @@
 
       <div 
         class="sidebar-item" 
-        :class="{ active: currentRouteName === 'user' }"
-        @click="$router.push('/user')"
+        :class="{ active: currentRouteName === 'projects' }"
+        @click="$router.push('/projects')"
+        title="Projects"
+      >
+        <span class="icon">🗂</span>
+        <span class="label-full" v-show="isExpanded">Projects</span>
+      </div>
+
+      <div 
+        class="sidebar-item"
+        :class="{ active: currentRouteName === 'user' || currentRouteName === 'home' }"
+        @click="router.push({ name: 'user' })"
         title="User Profile"
       >
         <span class="icon">👤</span>

@@ -37,7 +37,7 @@
              :isSimulating="isSimulating"
              @selectComponent="handleSelect" 
              @run-simulation="handleSimButtonClick"
-             @run-analysis="showAnalysisModal = true"
+             @run-analysis="router.push({ name: 'analysis', query: { projectId: router.currentRoute.value.query.projectId } })"
              @clear-parameters="handleResetParameters"
            />
          </transition>
@@ -182,6 +182,14 @@
       </div>
     </div>
 
+    <div class="bottom-panel-shell" :class="{ expanded: focState.enabled }">
+      <FocWorkbenchPanel
+        :project-id="currentProjectId || router.currentRoute.value.query.projectId || ''"
+        :model-name="focModelName"
+        :stop-time="focStopTime"
+      />
+    </div>
+
     <SimulationConfigModal 
         :visible="showSimSettingsModal" 
         :model-metadata="modelMetadata"
@@ -219,12 +227,16 @@ import ComponentEditor from '../components/features/simulation/ComponentEditor.v
 import ConnectionEditor from '../components/features/simulation/ConnectionEditor.vue';
 import SimulationConfigModal from '../components/features/simulation/SimulationConfigModal.vue'; 
 import AnalysisConfigModal from '../components/features/simulation/AnalysisConfigModal.vue'; // [NEW]
+import FocWorkbenchPanel from '../components/features/simulation/FocWorkbenchPanel.vue';
+import { useFocDraft } from '../composables/useFocDraft';
 import { resolveBackendBase } from '../utils/runtimeUrls';
 
 const props = defineProps({ mode: { type: String, default: 'normal' } });
 const router = useRouter();
+const selectedId = ref(null);
+const sceneRef = ref(null);
 
-const { 
+const {
   resetSession, updateDashboardVisibility, hasSimulationData, loadData, clearResults,
   modelConfig, modifiedParams, lastSimConfig, loadModelConfig,
   showLabels, showValues, alertRules, activeAlert, ignoreAlert, confirmAlert,
@@ -232,13 +244,12 @@ const {
   selectedConnectionId, isExpanded, setExpandedGroup,
   multiSelectedIds, createGroup, dissolveGroup, clearSelection,
   structureData,
-  componentParams, defaultParams, // [Added]
-  fetchHiddenComponents, 
-  saveHiddenComponents, isReadOnly, revertParam, updateParam 
+  componentParams, defaultParams,
+  fetchHiddenComponents,
+  saveHiddenComponents, isReadOnly, revertParam, updateParam,
+  currentProjectId
 } = useSimulation();
 
-const selectedId = ref(null);
-const sceneRef = ref(null);
 const isFullscreen = ref(false);
 const isEditorMode = ref(false);
 
@@ -277,6 +288,14 @@ const layoutState = reactive({
   isResizing: false
 });
 
+const focStopTime = computed(() => {
+  return Number(lastSimConfig.value?.simulation?.stop_time || 0) || null;
+});
+
+const focModelName = computed(() => {
+  return modelMetadata.value.modelName || lastSimConfig.value?.simulation?.model_name || 'example_model.Cycle';
+});
+
 // Component List
 const rawComponentList = computed(() => {
   if (!structureData.value || !structureData.value.components) return [];
@@ -305,6 +324,7 @@ watch(rawComponentList, async (list) => {
   }
 }, { immediate: true });
 
+  const { focState, setProjectScope: setFocProjectScope, clearDraft: clearFocDraft } = useFocDraft();
 const sidebarDisplayList = computed(() => {
   if (isSidebarEditMode.value) return rawComponentList.value;
   return rawComponentList.value.filter(c => !hiddenComponents.value.has(c.id));
@@ -385,6 +405,14 @@ const initPage = async () => {
   // Update: If we have a projectId, use it. Otherwise, if demo, use demo logic (or redirect)
   if (queryProjectId) {
       await loadModelConfig(); // actually deprecated but kept for safety
+
+  watch(
+    () => currentProjectId.value || router.currentRoute.value.query.projectId || 'default',
+    (projectId) => {
+      setFocProjectScope(projectId);
+    },
+    { immediate: true }
+  );
       const struct = await loadData(queryProjectId);
       if (!struct) { 
           $notify({ title: 'LOAD ERROR', message: 'Project data not found.', type: 'error' });
@@ -501,8 +529,10 @@ const handleResetParameters = async () => {
              if (def) p.value = def.defaultValue;
              else if (p.defaultValue !== undefined) p.value = p.defaultValue;
         });
-        $notify({ title: 'RESET COMPLETE', message: 'Parameters restored to defaults.', type: 'info' });
     }
+
+  clearFocDraft();
+  $notify({ title: 'RESET COMPLETE', message: 'Parameters and FOC settings restored to defaults.', type: 'info' });
 };
 
 const doClearResults = async () => { const isConfirmed = await $confirm("Clear all simulation data? This action cannot be undone.", "PURGE DATA"); if (isConfirmed) await clearResults(); };
@@ -527,8 +557,18 @@ const handleSelect = (id) => { selectedId.value = id; };
 const handleConfigUpdate = () => { if (selectedId.value && sceneRef.value) sceneRef.value.reloadComponent(selectedId.value); };
 const handleResize = () => updateDashboardVisibility();
 
-onMounted(() => { initPage(); window.addEventListener('resize', handleResize); document.addEventListener('fullscreenchange', onFullscreenChange); updateDashboardVisibility(); });
-onUnmounted(() => { window.removeEventListener('resize', handleResize); document.removeEventListener('fullscreenchange', onFullscreenChange); clearInterval(timerInterval); clearInterval(pollInterval); });
+onMounted(() => {
+  initPage();
+  window.addEventListener('resize', handleResize);
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  updateDashboardVisibility();
+});
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+  document.removeEventListener('fullscreenchange', onFullscreenChange);
+  clearInterval(timerInterval);
+  clearInterval(pollInterval);
+});
 </script>
 
 <style scoped>
@@ -579,10 +619,10 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
   transition: all 0.2s;
   letter-spacing: 0.5px;
 }
-.run-btn:hover { transform: translateY(-1px); box-shadow: 0 0 20px rgba(0, 210, 255, 0.4); filter: brightness(1.1); }
-.run-btn:active { transform: translateY(0); }
-.run-btn.running { background: #333; color: #888; border: 1px solid #444; box-shadow: none; cursor: wait; }
-.run-btn .icon { font-size: 12px; }
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
 
 .icon-btn {
   background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #888;
@@ -600,6 +640,22 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
   padding: 10px; 
   box-sizing: border-box; 
   /* Removed absolute positioning */
+}
+
+.bottom-panel-shell {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  padding: 0 10px 10px;
+  box-sizing: border-box;
+}
+
+.bottom-panel-shell.expanded {
+  flex: 0 0 30%;
+  height: 30%;
+  min-height: 30%;
+  max-height: 30%;
 }
 .grid-area-top { grid-area: top; min-height: 0; overflow: hidden; }
 
@@ -1149,6 +1205,9 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
     padding: 20px;
     overflow-y: auto;
     flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .panel-footer {
     padding: 15px;
@@ -1157,13 +1216,23 @@ onUnmounted(() => { window.removeEventListener('resize', handleResize); document
 }
 .small-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-auto-rows: minmax(0, 1fr);
+    align-items: stretch;
+    align-content: stretch;
     gap: 8px;
     margin-top: 10px;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
 }
 .small-grid .type-card-mini {
     padding: 10px;
-    min-height: 60px;
+  min-height: 60px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .small-grid .type-icon { font-size: 16px; margin-bottom: 4px; }
 .small-grid h4 { font-size: 11px; }

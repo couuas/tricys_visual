@@ -8,6 +8,9 @@
     </div>
     
     <div class="tab-content">
+      <div v-if="taskFocConfig" class="foc-preview-panel">
+        <TaskFocPreview :task="task" />
+      </div>
       <div class="files-layout">
         <ResultFileBrowser
           class="files-tree"
@@ -61,13 +64,16 @@ import { useRoute, useRouter } from 'vue-router';
 import { taskApi } from '../../../api/task';
 import { visualizerApi } from '../../../api/visualizer';
 import ResultFileBrowser from './ResultFileBrowser.vue';
+import TaskFocPreview from '../simulation/TaskFocPreview.vue';
 import { $notify, $updateNotification, closeNotification } from '../../../utils/notification';
 import { marked } from 'marked';
 import apiClient from '../../../api/client';
+import { getTaskFocConfig } from '../../../utils/taskFoc';
 
 const props = defineProps({
   taskId: { type: String, required: true },
-  taskName: { type: String, default: 'Task Result' }
+  taskName: { type: String, default: 'Task Result' },
+  task: { type: Object, default: null }
 });
 
 const router = useRouter();
@@ -83,6 +89,7 @@ const hdf5Launching = ref(false);
 let hdf5NotifyId = null;
 const markdownRef = ref(null);
 const imageObjectUrls = new Set();
+const taskFocConfig = computed(() => getTaskFocConfig(props.task));
 
 const loadFileList = async (id) => {
   try {
@@ -262,6 +269,7 @@ watch(renderedMarkdown, async () => {
 .result-header h3 { margin: 0; font-size: 14px; color: #fff; letter-spacing: 1px; }
 
 .tab-content { flex: 1; overflow: hidden; position: relative; display: flex; flex-direction: column; min-height: 0; }
+.foc-preview-panel { padding: 12px 12px 0; flex-shrink: 0; }
 .files-layout { display: flex; height: 100%; min-width: 0; min-height: 0; }
 .files-tree { width: 320px; min-width: 240px; border-right: 1px solid #30363d; flex-shrink: 0; }
 .file-preview { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow: hidden; }
@@ -287,4 +295,18 @@ watch(renderedMarkdown, async () => {
 
 .hint { margin-top: 6px; font-size: 11px; color: #8b949e; }
 .empty { color: #555; font-style: italic; padding: 20px; text-align: center; }
+
+@media (max-width: 960px) {
+  .files-layout {
+    flex-direction: column;
+  }
+
+  .files-tree {
+    width: 100%;
+    min-width: 0;
+    max-height: 260px;
+    border-right: none;
+    border-bottom: 1px solid #30363d;
+  }
+}
 </style>

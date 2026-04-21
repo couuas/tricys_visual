@@ -95,7 +95,7 @@
     </div>
 
     <!-- Floating Dock Toolbar -->
-    <div class="scene-toolbar-float" v-if="!isReadOnly">
+    <div class="scene-toolbar-float" v-if="showActionDock && !isReadOnly">
       <div class="toolbar-dock">
 
         <button 
@@ -116,14 +116,9 @@
         
         <div class="vr-divider"></div>
 
-        <button class="dock-btn secondary" @click.stop="emit('run-analysis')">
-           <span class="icon">⚡</span>
-           <span class="label">ANALYSIS</span>
-        </button>
-
         <button class="dock-btn flat" @click.stop="emit('clear-parameters')">
            <span class="icon">✕</span>
-           <span class="label">CLEAR</span>
+           <span class="label">RESET</span>
         </button>
 
       </div>
@@ -147,7 +142,8 @@ import { useRouter } from 'vue-router';
 import { resolveBackendBase } from '../../../utils/runtimeUrls';
 
 const props = defineProps({
-    isSimulating: { type: Boolean, default: false }
+    isSimulating: { type: Boolean, default: false },
+    showActionDock: { type: Boolean, default: true }
 });
 const emit = defineEmits(['selectComponent', 'groupContext', 'run-simulation', 'run-analysis', 'clear-parameters']);
 const router = useRouter();

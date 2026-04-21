@@ -24,6 +24,7 @@
            <ResultViewer
              :taskId="selectedTaskId"
              :taskName="getTaskName(selectedTaskId)"
+             :task="selectedTask"
              @back="handleBack"
            />
         </div>
@@ -41,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, reactive } from 'vue';
+import { ref, onMounted, onUnmounted, reactive, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 // TaskList removed
 import TaskStatusPanel from '../components/features/monitor/TaskStatusPanel.vue';
@@ -63,6 +64,7 @@ const tasks = ref([]);
 const selectedTaskId = ref(null);
 const isResultView = ref(false); // Toggle between Monitor (logs) and Result (files)
 const isReadOnlyPreview = ref(false);
+const selectedTask = computed(() => tasks.value.find((task) => task.id === selectedTaskId.value) || null);
 const currentTask = reactive({
   status: 'PENDING',
   progress: 0,
@@ -96,6 +98,39 @@ const getTaskName = (id) => {
     return t ? t.name : 'Task';
 };
 
+const upsertTask = (task) => {
+  if (!task?.id) {
+    return null;
+  }
+
+  const index = tasks.value.findIndex((item) => item.id === task.id);
+  if (index >= 0) {
+    tasks.value[index] = { ...tasks.value[index], ...task };
+  } else {
+    tasks.value = [task, ...tasks.value];
+  }
+
+  return tasks.value.find((item) => item.id === task.id) || task;
+};
+
+const ensureTaskRecord = async (id, fallbackTask = null) => {
+  if (fallbackTask?.id) {
+    return upsertTask(fallbackTask);
+  }
+
+  const existing = tasks.value.find((task) => task.id === id);
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    const task = await taskApi.getTask(id);
+    return upsertTask(task);
+  } catch {
+    return null;
+  }
+};
+
 const handleBack = () => {
   selectedTaskId.value = null;
   isResultView.value = false;
@@ -125,7 +160,7 @@ const resolvePreviewStatus = async () => {
   }
 };
 
-const handleTaskSelect = (id) => {
+const handleTaskSelect = async (id) => {
   if (selectedTaskId.value === id && !isResultView.value) return;
   selectedTaskId.value = id;
   isResultView.value = false; // Reset to Monitor/Log view
@@ -134,7 +169,7 @@ const handleTaskSelect = (id) => {
   currentTask.progress = 0;
   
   // Find task basic info
-  const basic = tasks.value.find(t => t.id === id);
+  const basic = await ensureTaskRecord(id);
   if (basic) {
     currentTask.status = basic.status;
     currentTask.created_at = basic.created_at;
@@ -346,9 +381,10 @@ const handleStopTask = async () => {
    } catch (e) { $notify({ title: 'ERROR', message: 'Stop failed', type: 'error' }); }
 };
 
-const handleDirectViewResult = (task) => {
+const handleDirectViewResult = async (task) => {
   if (task && task.id) {
-    selectedTaskId.value = task.id;
+    const resolvedTask = await ensureTaskRecord(task.id, task);
+    selectedTaskId.value = resolvedTask?.id || task.id;
     isResultView.value = true;
     disconnectWS(); // Ensure we don't hold WS for completed task unnecessarily
   }

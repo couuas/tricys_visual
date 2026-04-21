@@ -19,6 +19,30 @@
       <!-- Main Content Area -->
       <div class="modal-body">
           <div class="panel-center" v-if="!showPreview">
+            <div v-if="hasCustomFoc" class="config-block foc-inline-block">
+              <div class="flex-between foc-inline-header">
+                <h3 class="block-title">FOC Preview</h3>
+                <div class="foc-inline-meta">
+                  <span class="foc-meta-chip">{{ focState.strategy }}</span>
+                  <span class="foc-meta-chip">{{ focState.sourceName || 'task_input.foc' }}</span>
+                </div>
+              </div>
+
+              <div v-if="focStopTimeWarning" class="modal-warning-banner">
+                {{ focStopTimeWarning }}
+              </div>
+
+              <div v-if="focState.error" class="modal-error-banner">
+                {{ focState.error }}
+              </div>
+
+              <div class="foc-inline-grid">
+                <pre class="foc-inline-code">{{ focState.content }}</pre>
+                <div class="foc-inline-chart-shell">
+                  <FocTimelineChart :rows="focPreviewRows" :loading="focState.isPreviewLoading" />
+                </div>
+              </div>
+            </div>
             
             <!-- Block 1: Settings -->
             <div class="config-block">
@@ -37,6 +61,7 @@
                 <div>
                   <label class="input-label">Stop Time (s)</label>
                   <input v-model.number="simSettings.stopTime" type="number" min="0.001" step="0.1" class="input-styled" />
+                  <div v-if="focStopTimeWarning" class="field-warning-text">{{ focStopTimeWarning }}</div>
                 </div>
                 <div>
                   <label class="input-label">Step Size (s)</label>
@@ -354,7 +379,9 @@ import { useRouter } from 'vue-router';
 import { taskApi } from '../../../api/task';
 import { projectApi } from '../../../api/project';
 import { useSimulation } from '../../../composables/useSimulation';
+import { useFocDraft } from '../../../composables/useFocDraft';
 import { $notify } from '../../../utils/notification';
+import FocTimelineChart from './FocTimelineChart.vue';
 
 const props = defineProps({
   visible: Boolean,
@@ -378,6 +405,13 @@ const {
   lastSimConfig,
   saveComponentFilterRule
 } = useSimulation();
+
+const {
+  focState,
+  taskPayload: focTaskPayload,
+  setProjectScope,
+  previewNow
+} = useFocDraft();
 
 const isSubmitting = ref(false);
 const showPreview = ref(false);
@@ -447,6 +481,14 @@ const manualFilter = ref({
 // Metrics JSON
 const showMetricsEditor = ref(false);
 
+const hasCustomFoc = computed(() => Boolean(focState.value.enabled && focState.value.content.trim()));
+const focPreviewRows = computed(() => focState.value.preview?.rows ?? []);
+const focStopTimeWarning = computed(() => {
+  return (focState.value.warnings || []).find((warning) =>
+    String(warning).includes('Configured stop_time is shorter than the FOC schedule duration.')
+  ) || '';
+});
+
 const flatFilterRules = computed(() => {
   if (!Array.isArray(filterSchema.value)) return [];
   return filterSchema.value.map((rule, index) => {
@@ -506,6 +548,8 @@ onUnmounted(() => {
 
 watch(() => props.visible, async (val) => {
    if (val) {
+      const projectId = router.currentRoute.value.query.projectId || 'default';
+      setProjectScope(projectId);
       if (router.currentRoute.value.query.projectId) {
         if (!componentParams.value || componentParams.value.length === 0) {
              await loadData(router.currentRoute.value.query.projectId);
@@ -522,8 +566,31 @@ watch(() => props.visible, async (val) => {
       if (config.metrics_definition) {
         metricsJsonString.value = JSON.stringify(config.metrics_definition, null, 4);
       }
+      showPreview.value = false;
+
+      if (hasCustomFoc.value) {
+        await previewNow(simSettings.value.stopTime);
+      }
    }
 });
+
+watch(
+  () => simSettings.value.stopTime,
+  (value) => {
+    if (props.visible && hasCustomFoc.value) {
+      previewNow(value);
+    }
+  }
+);
+
+watch(
+  () => [props.visible, focState.value.enabled, focState.value.content, focState.value.strategy],
+  ([visible, enabled, content]) => {
+    if (visible && enabled && String(content || '').trim()) {
+      previewNow(simSettings.value.stopTime);
+    }
+  }
+);
 
   watch(() => simSettings.value.maximizeWorkers, (value) => {
     if (value) {
@@ -719,7 +786,10 @@ async function confirmSubmit() {
    try {
       const payload = JSON.parse(previewPayload.value); // Use what is reviewed
 
-  await projectApi.saveRunConfig(router.currentRoute.value.query.projectId, payload.config_json);
+  await projectApi.saveRunConfig(
+    router.currentRoute.value.query.projectId,
+    buildPersistentRunConfig(payload.config_json)
+  );
       
       const taskObj = await taskApi.createTask(payload);
       
@@ -812,6 +882,7 @@ function generatePayload() {
            concurrent: simSettings.value.concurrent,
            maximize_workers: simSettings.value.maximizeWorkers,
            ...(simSettings.value.concurrent && !simSettings.value.maximizeWorkers && simSettings.value.maxWorkers ? { max_workers: simSettings.value.maxWorkers } : {}),
+               ...(focTaskPayload.value || {}),
                variableFilter: defaultFilter 
            }, 
            simulation_parameters: simParams, 
@@ -822,6 +893,18 @@ function generatePayload() {
     
     return payload;
 }
+
+  function buildPersistentRunConfig(configJson) {
+    const clone = JSON.parse(JSON.stringify(configJson || {}));
+    if (clone.simulation) {
+      delete clone.simulation.foc_content;
+      delete clone.simulation.foc_name;
+      delete clone.simulation.foc_strategy;
+      delete clone.simulation.foc_enabled;
+      delete clone.simulation.foc_path;
+    }
+    return clone;
+  }
 </script>
 
 <style scoped>
@@ -881,6 +964,9 @@ function generatePayload() {
 .config-block {
   background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 15px; margin-bottom: 20px;
 }
+.foc-inline-block {
+  padding: 14px;
+}
 .block-title {
   font-size: 11px; font-weight: 700; color: #8b949e; text-transform: uppercase; margin: 0 0 15px 0; letter-spacing: 0.5px;
 }
@@ -889,6 +975,12 @@ function generatePayload() {
 }
 
 .input-label { display: block; color: #8b949e; font-size: 11px; font-weight: 600; margin-bottom: 5px; }
+.field-warning-text {
+  margin-top: 6px;
+  color: #fbbf24;
+  font-size: 11px;
+  line-height: 1.4;
+}
 .mini-label { display: block; color: #8b949e; font-size: 10px; text-transform: uppercase; margin-bottom: 4px; }
 .config-subsection { margin-top: 12px; padding-top: 12px; border-top: 1px solid #21262d; }
 .subsection-title { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
@@ -995,6 +1087,79 @@ function generatePayload() {
 .filter-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .filter-column-preview { flex: 1; font-size: 11px; color: #00d2ff; font-family: 'JetBrains Mono', monospace; align-self: center; }
 
+.foc-inline-header {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.foc-inline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.foc-meta-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: #7dd3fc;
+  background: rgba(2, 132, 199, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.modal-warning-banner,
+.modal-error-banner {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.modal-warning-banner {
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.25);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+}
+
+.modal-error-banner {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.24);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.foc-inline-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.95fr) minmax(0, 1.35fr);
+  gap: 12px;
+  min-height: 260px;
+}
+
+.foc-inline-code {
+  margin: 0;
+  min-height: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #05070a;
+  color: #c9d1d9;
+  font-size: 11px;
+  line-height: 1.55;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: pre-wrap;
+}
+
+.foc-inline-chart-shell {
+  min-height: 260px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #0b1016;
+  overflow: hidden;
+}
+
 
 
 .preview-box {
@@ -1037,5 +1202,15 @@ function generatePayload() {
 
 .dropdown-fade-enter-from, .dropdown-fade-leave-to { opacity: 0; transform: translateY(-10px); }
 .dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: all 0.2s ease; }
+
+@media (max-width: 900px) {
+  .foc-inline-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .foc-inline-chart-shell {
+    min-height: 220px;
+  }
+}
 
 </style>
