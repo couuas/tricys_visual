@@ -324,7 +324,7 @@ watch(rawComponentList, async (list) => {
   }
 }, { immediate: true });
 
-  const { focState, setProjectScope: setFocProjectScope, clearDraft: clearFocDraft } = useFocDraft();
+const { focState, setProjectScope: setFocProjectScope, syncFromConfig: syncFocFromConfig, clearDraft: clearFocDraft } = useFocDraft();
 const sidebarDisplayList = computed(() => {
   if (isSidebarEditMode.value) return rawComponentList.value;
   return rawComponentList.value.filter(c => !hiddenComponents.value.has(c.id));
@@ -394,6 +394,14 @@ const startResize = (direction, event) => {
 watch(selectedId, (newVal) => { if (newVal && !isDashboardMode.value) selectedConnectionId.value = null; });
 watch(selectedConnectionId, (newVal) => { if (newVal && !isDashboardMode.value) selectedId.value = null; });
 // watch(lastSimConfig, ...) -> Logic moved to child component but we can keep global watcher or just let onShow handle it
+
+watch(
+  () => lastSimConfig.value?.foc,
+  (focConfig) => {
+    syncFocFromConfig(focConfig || null);
+  },
+  { immediate: true, deep: true }
+);
 
 const isDemo = computed(() => props.mode === 'demo');
 const statusText = computed(() => { if (isDemo.value) return hasSimulationData.value ? 'Demo Active' : 'Demo Model Ready'; return hasSimulationData.value ? 'Session Active' : 'Model View Only'; });

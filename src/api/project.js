@@ -28,6 +28,10 @@ export const projectApi = {
     return apiClient.get(`/project/${projectId}`);
   },
 
+  getGoviewSession(projectId) {
+    return apiClient.post(`/project/${projectId}/goview/session`);
+  },
+
   deleteProject(projectId) {
     return apiClient.delete(`/project/${projectId}`);
   },
@@ -161,6 +165,42 @@ export const projectApi = {
 
   renameProject(projectId, name) {
     return apiClient.patch(`/project/${projectId}`, { name });
+  },
+
+  listProjectPages(projectId) {
+    return apiClient.get(`/project/${projectId}/pages`);
+  },
+
+  ensureProjectPage(projectId) {
+    return apiClient.post(`/project/${projectId}/pages/ensure`);
+  },
+
+  createProjectPage(projectId, payload) {
+    return apiClient.post(`/project/${projectId}/pages`, payload);
+  },
+
+  listProjectPageTemplates() {
+    return apiClient.get('/project/page-templates');
+  },
+
+  listProjectPageDataSources(projectId) {
+    return apiClient.get(`/project/${projectId}/page-data-sources`);
+  },
+
+  publishProjectPage(projectId, pageId, published) {
+    return apiClient.patch(`/project/${projectId}/pages/${pageId}/publish`, { published });
+  },
+
+  listProjectPageReleases(projectId, pageId) {
+    return apiClient.get(`/project/${projectId}/pages/${pageId}/releases`);
+  },
+
+  restoreProjectPageRelease(projectId, pageId, releaseId) {
+    return apiClient.post(`/project/${projectId}/pages/${pageId}/releases/${releaseId}/restore`);
+  },
+
+  deleteProjectPage(projectId, pageId) {
+    return apiClient.delete(`/project/${projectId}/pages/${pageId}`);
   },
 
   checkConsistency(fix = false) {

@@ -111,6 +111,18 @@ export function useSimulation() {
     return str1 !== str2;
   };
 
+  const normalizeParamValueForComparison = (value) => {
+    if (Array.isArray(value)) return `{${value.join(', ')}}`;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        return `{${trimmed.slice(1, -1)}}`;
+      }
+      return trimmed;
+    }
+    return value;
+  };
+
   const modifiedParams = computed(() => {
     const diffs = {};
     if (!componentParams.value || !Array.isArray(componentParams.value)) return diffs;
@@ -128,10 +140,11 @@ export function useSimulation() {
       const compId = parts.length > 1 ? parts[0] : 'global';
       const paramKey = parts.length > 1 ? parts.slice(1).join('.') : name;
 
-      const defaultVal = defaultsMap.get(name);
+      const defaultVal = normalizeParamValueForComparison(defaultsMap.get(name));
+      const currentVal = normalizeParamValueForComparison(p.value);
 
       // Compare
-      if (isParamDifferent(p.value, defaultVal)) {
+      if (isParamDifferent(currentVal, defaultVal)) {
         if (!diffs[compId]) diffs[compId] = {};
         diffs[compId][paramKey] = p.value;
       }

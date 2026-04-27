@@ -16,6 +16,7 @@
     </div>
 
     <div v-if="errorMessage" class="task-foc-error">{{ errorMessage }}</div>
+    <div v-else-if="previewUnavailableReason" class="task-foc-empty">{{ previewUnavailableReason }}</div>
     <div class="task-foc-chart-wrap">
       <FocTimelineChart :rows="rows" :loading="loading" />
     </div>
@@ -73,9 +74,21 @@ const durationLabel = computed(() => {
 
 const stepCountLabel = computed(() => preview.value?.step_count ?? '--');
 const rowCountLabel = computed(() => rows.value.length || preview.value?.rows?.length || 0);
+const previewUnavailableReason = computed(() => {
+  if (!focConfig.value) {
+    return '';
+  }
+  if (focConfig.value.hasInlineContent) {
+    return '';
+  }
+  if (focConfig.value.path) {
+    return `This task used foc_path: ${focConfig.value.path}`;
+  }
+  return 'Inline FOC content is unavailable for preview.';
+});
 
 async function loadPreview() {
-  if (!props.active || !focConfig.value || !requestSignature.value) {
+  if (!props.active || !focConfig.value || !requestSignature.value || !focConfig.value.hasInlineContent) {
     return;
   }
 
@@ -111,6 +124,14 @@ watch(
   () => [props.active, requestSignature.value],
   () => {
     if (!focConfig.value) {
+      rows.value = [];
+      preview.value = null;
+      errorMessage.value = '';
+      loadedSignature.value = '';
+      return;
+    }
+
+    if (!focConfig.value.hasInlineContent) {
       rows.value = [];
       preview.value = null;
       errorMessage.value = '';
@@ -186,6 +207,11 @@ watch(
 
 .task-foc-error {
   color: #fca5a5;
+  font-size: 12px;
+}
+
+.task-foc-empty {
+  color: #cbd5e1;
   font-size: 12px;
 }
 

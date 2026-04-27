@@ -7,6 +7,19 @@ const browserOrigin = () => {
 
 const trimTrailingSlash = (value) => value.replace(/\/$/, '');
 
+const withDevEntryDocument = (value) => {
+  try {
+    const url = new URL(value);
+    if (/\.html$/i.test(url.pathname)) {
+      return url.toString();
+    }
+    url.pathname = url.pathname.endsWith('/') ? `${url.pathname}index.html` : `${url.pathname}/index.html`;
+    return url.toString();
+  } catch (_error) {
+    return value;
+  }
+};
+
 const toAbsoluteUrl = (value, fallbackPath) => {
   const raw = (value || fallbackPath || '').trim();
   if (!raw) {
@@ -52,7 +65,7 @@ export const resolveGoviewBase = () => {
       // In local dev, GoView runs as its own Vite app and its index.html loads
       // root-relative /src/main.ts, so it must stay on its own origin/port.
       if (import.meta.env.DEV) {
-        return trimTrailingSlash(configuredUrl.toString());
+        return withDevEntryDocument(configuredUrl.toString());
       }
 
       const isLoopbackHost = ['localhost', '127.0.0.1'].includes(configuredUrl.hostname);

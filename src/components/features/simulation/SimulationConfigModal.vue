@@ -19,12 +19,12 @@
       <!-- Main Content Area -->
       <div class="modal-body">
           <div class="panel-center" v-if="!showPreview">
-            <div v-if="hasCustomFoc" class="config-block foc-inline-block">
+            <div v-if="hasConfiguredFoc" class="config-block foc-inline-block">
               <div class="flex-between foc-inline-header">
                 <h3 class="block-title">FOC Preview</h3>
                 <div class="foc-inline-meta">
-                  <span class="foc-meta-chip">{{ focState.strategy }}</span>
-                  <span class="foc-meta-chip">{{ focState.sourceName || 'task_input.foc' }}</span>
+                  <span v-if="focComponentLabel" class="foc-meta-chip">{{ focComponentLabel }}</span>
+                  <span class="foc-meta-chip">{{ focSourceLabel }}</span>
                 </div>
               </div>
 
@@ -32,12 +32,16 @@
                 {{ focStopTimeWarning }}
               </div>
 
+              <div v-if="focPreviewUnavailableReason" class="modal-warning-banner">
+                {{ focPreviewUnavailableReason }}
+              </div>
+
               <div v-if="focState.error" class="modal-error-banner">
                 {{ focState.error }}
               </div>
 
               <div class="foc-inline-grid">
-                <pre class="foc-inline-code">{{ focState.content }}</pre>
+                <pre class="foc-inline-code">{{ focState.content || '# Preview unavailable for foc_path-only configuration.' }}</pre>
                 <div class="foc-inline-chart-shell">
                   <FocTimelineChart :rows="focPreviewRows" :loading="focState.isPreviewLoading" />
                 </div>
@@ -66,6 +70,19 @@
                 <div>
                   <label class="input-label">Step Size (s)</label>
                   <input v-model.number="simSettings.stepSize" type="number" min="0.001" step="0.01" class="input-styled" />
+                </div>
+                <div v-if="hasConfiguredFoc" class="config-subsection">
+                  <div class="subsection-title">FOC Options</div>
+                  <div class="foc-config-grid">
+                    <div>
+                      <label class="input-label">foc_component</label>
+                      <input :value="focState.component ? focState.component : 'selection required'" readonly class="input-styled readonly" />
+                    </div>
+                    <div>
+                      <label class="input-label">foc_path</label>
+                      <input :value="focState.path ? focState.path : 'inline foc_content mode'" readonly class="input-styled readonly" />
+                    </div>
+                  </div>
                 </div>
                 <div class="config-subsection">
                   <div class="subsection-title">Execution Options</div>
@@ -410,6 +427,7 @@ const {
   focState,
   taskPayload: focTaskPayload,
   setProjectScope,
+  syncFromConfig,
   previewNow
 } = useFocDraft();
 
@@ -481,12 +499,38 @@ const manualFilter = ref({
 // Metrics JSON
 const showMetricsEditor = ref(false);
 
-const hasCustomFoc = computed(() => Boolean(focState.value.enabled && focState.value.content.trim()));
+const hasConfiguredFoc = computed(() => Boolean(focTaskPayload.value));
+const hasInlineFocContent = computed(() => Boolean(focState.value.enabled && String(focState.value.content || '').trim()));
+const focComponentLabel = computed(() => {
+  if (!String(focState.value.component || '').trim()) {
+    return '';
+  }
+  return `target: ${String(focState.value.component).trim()}`;
+});
+const focSourceLabel = computed(() => {
+  const path = String(focState.value.path || '').trim();
+  if (path) {
+    return path;
+  }
+  return focState.value.sourceName || 'task_input.foc';
+});
 const focPreviewRows = computed(() => focState.value.preview?.rows ?? []);
 const focStopTimeWarning = computed(() => {
   return (focState.value.warnings || []).find((warning) =>
     String(warning).includes('Configured stop_time is shorter than the FOC schedule duration.')
   ) || '';
+});
+const focPreviewUnavailableReason = computed(() => {
+  if (!hasConfiguredFoc.value) {
+    return '';
+  }
+  if (hasInlineFocContent.value) {
+    return '';
+  }
+  if (String(focState.value.path || '').trim()) {
+    return 'This FOC is configured by foc_path. Inline timeline preview is unavailable until content is uploaded or pasted into the workbench.';
+  }
+  return 'FOC is enabled, but no content or foc_path is configured.';
 });
 
 const flatFilterRules = computed(() => {
@@ -558,6 +602,7 @@ watch(() => props.visible, async (val) => {
 
       const config = lastSimConfig.value || {};
       const simulation = config.simulation || {};
+      syncFromConfig(config.foc || null);
       if (simulation.stop_time !== undefined) simSettings.value.stopTime = simulation.stop_time;
       if (simulation.step_size !== undefined) simSettings.value.stepSize = simulation.step_size;
       simSettings.value.concurrent = Boolean(simulation.concurrent);
@@ -568,7 +613,7 @@ watch(() => props.visible, async (val) => {
       }
       showPreview.value = false;
 
-      if (hasCustomFoc.value) {
+      if (hasInlineFocContent.value) {
         await previewNow(simSettings.value.stopTime);
       }
    }
@@ -577,7 +622,7 @@ watch(() => props.visible, async (val) => {
 watch(
   () => simSettings.value.stopTime,
   (value) => {
-    if (props.visible && hasCustomFoc.value) {
+    if (props.visible && hasInlineFocContent.value) {
       previewNow(value);
     }
   }
@@ -839,6 +884,10 @@ function parseUserInputValue(str) {
 }
 
 function generatePayload() {
+  if (hasConfiguredFoc.value && !String(focState.value.component || '').trim()) {
+    throw new Error('FOC requires a foc_component selection before submission.');
+  }
+
     // 1. Convert Manual Params to Dict from SYNCED state
     const simParams = {};
     if (modifiedParams.value) {
@@ -882,9 +931,9 @@ function generatePayload() {
            concurrent: simSettings.value.concurrent,
            maximize_workers: simSettings.value.maximizeWorkers,
            ...(simSettings.value.concurrent && !simSettings.value.maximizeWorkers && simSettings.value.maxWorkers ? { max_workers: simSettings.value.maxWorkers } : {}),
-               ...(focTaskPayload.value || {}),
                variableFilter: defaultFilter 
            }, 
+         ...(focTaskPayload.value ? { foc: focTaskPayload.value } : {}),
            simulation_parameters: simParams, 
            metrics_definition: metrics,
            ...(filterSchema.value.length > 0 ? { filter_schema: filterSchema.value } : {})
@@ -895,15 +944,7 @@ function generatePayload() {
 }
 
   function buildPersistentRunConfig(configJson) {
-    const clone = JSON.parse(JSON.stringify(configJson || {}));
-    if (clone.simulation) {
-      delete clone.simulation.foc_content;
-      delete clone.simulation.foc_name;
-      delete clone.simulation.foc_strategy;
-      delete clone.simulation.foc_enabled;
-      delete clone.simulation.foc_path;
-    }
-    return clone;
+      return JSON.parse(JSON.stringify(configJson || {}));
   }
 </script>
 
@@ -1136,6 +1177,12 @@ function generatePayload() {
   min-height: 260px;
 }
 
+.foc-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .foc-inline-code {
   margin: 0;
   min-height: 0;
@@ -1205,6 +1252,10 @@ function generatePayload() {
 
 @media (max-width: 900px) {
   .foc-inline-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .foc-config-grid {
     grid-template-columns: 1fr;
   }
 

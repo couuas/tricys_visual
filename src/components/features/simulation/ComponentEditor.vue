@@ -364,16 +364,20 @@ const loadEditorData = () => {
   
   const formatArrayParam = (p) => {
       let cloned = { ...p };
-      const convert = (val) => {
+      const convertDefaultValue = (val) => {
           if (Array.isArray(val)) return '{' + val.join(', ') + '}';
           if (typeof val === 'string' && val.trim().startsWith('[') && val.trim().endsWith(']')) {
               return '{' + val.trim().slice(1, -1) + '}';
           }
           return val;
       };
-      cloned.defaultValue = convert(cloned.defaultValue);
+      const convertCurrentValue = (val) => {
+        if (Array.isArray(val)) return '[' + val.join(', ') + ']';
+        return val;
+      };
+      cloned.defaultValue = convertDefaultValue(cloned.defaultValue);
       if (cloned.value !== undefined && cloned.value !== null) {
-          cloned.value = convert(cloned.value);
+        cloned.value = convertCurrentValue(cloned.value);
       }
       return cloned;
   };

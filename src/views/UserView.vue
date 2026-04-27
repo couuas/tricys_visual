@@ -97,8 +97,8 @@
                 {{ isConsistencyRunning ? 'FIXING...' : 'Fix Consistency' }}
               </button>
               <button v-if="isAdmin" class="panel-btn admin" @click="router.push({ name: 'admin' })">Open Admin Panel</button>
-              <button class="panel-btn danger" @click="handleLogout">Sign Out</button>
             </div>
+            <button class="panel-btn danger sign-out-btn" @click="handleLogout">Sign Out</button>
           </article>
         </section>
       </div>
@@ -136,14 +136,6 @@ const userInitials = computed(() => {
 
 const isAdmin = computed(() => Boolean(currentUser.value && (currentUser.value.is_superuser === true || currentUser.value.is_superuser === 1)));
 
-const resolvePostAuthRoute = () => {
-  const redirect = route.query.redirect;
-  if (typeof redirect === 'string' && redirect.trim()) {
-    return redirect;
-  }
-  return { name: 'projects' };
-};
-
 const handleLogin = async () => {
   if (!loginForm.username || !loginForm.password) {
     errorMsg.value = 'Credentials required';
@@ -162,7 +154,6 @@ const handleLogin = async () => {
   }
 
   $notify({ title: 'ACCESS GRANTED', message: `Welcome, ${response.user.username}.`, type: 'success' });
-  router.push(resolvePostAuthRoute());
 };
 
 const handleRegister = async () => {
@@ -183,7 +174,6 @@ const handleRegister = async () => {
   }
 
   $notify({ title: 'IDENTITY CREATED', message: `Registered as ${response.user.username}.`, type: 'success' });
-  router.push(resolvePostAuthRoute());
 };
 
 const handleLogout = async () => {
@@ -244,6 +234,9 @@ const resumeLastProject = async () => {
 .panel-btn.primary:hover:not(:disabled) { color: #02131a; filter: brightness(1.08); }
 .panel-btn.admin { border-color: rgba(255, 0, 85, 0.45); color: #ff5b8a; }
 .panel-btn.admin:hover:not(:disabled) { border-color: #ff0055; color: #ff0055; }
+.panel-btn.danger { margin-top: 12px; width: 100%; background: linear-gradient(135deg, rgba(140, 16, 40, 0.95), rgba(255, 61, 84, 0.92)); border-color: rgba(255, 117, 137, 0.55); color: #fff4f6; }
+.panel-btn.danger:hover:not(:disabled) { border-color: #ff7589; color: #fff; filter: brightness(1.05); }
+.sign-out-btn { display: block; }
 .fade-in { animation: fadeIn 0.5s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) {

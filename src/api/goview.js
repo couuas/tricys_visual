@@ -45,5 +45,11 @@ export const goviewApi = {
   },
   getProjectData(id) {
     return goviewClient.get('/project/getData', { params: { id } });
+  },
+  publishProject(payload) {
+    return goviewClient.put('/project/publish', payload);
+  },
+  deleteProject(id) {
+    return goviewClient.delete('/project/delete', { params: { id } });
   }
 };
