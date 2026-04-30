@@ -5,7 +5,48 @@ const browserOrigin = () => {
   return window.location.origin;
 };
 
+const readSearchParam = (key) => {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  try {
+    const searchParams = new URLSearchParams(window.location.search || '');
+    const hash = window.location.hash || '';
+    const hashQuery = hash.includes('?') ? hash.split('?')[1] : '';
+    const hashParams = new URLSearchParams(hashQuery);
+    return searchParams.get(key) || hashParams.get(key) || '';
+  } catch (_error) {
+    return '';
+  }
+};
+
+const readTricysContext = () => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  try {
+    const raw = window.localStorage?.getItem('TRICYS_CTX');
+    return raw ? JSON.parse(raw) : {};
+  } catch (_error) {
+    return {};
+  }
+};
+
 const trimTrailingSlash = (value) => value.replace(/\/$/, '');
+
+const normalizeApiBase = (value) => {
+  const normalized = trimTrailingSlash(value || '');
+  if (!normalized) {
+    return normalized;
+  }
+  if (/\/api\/v2\/goview$/i.test(normalized)) {
+    return normalized.replace(/\/api\/v2\/goview$/i, '/api/v1');
+  }
+  if (/\/goview$/i.test(normalized)) {
+    return normalized.replace(/\/goview$/i, '/api/v1');
+  }
+  return normalized;
+};
 
 const withDevEntryDocument = (value) => {
   try {
@@ -33,7 +74,9 @@ const toAbsoluteUrl = (value, fallbackPath) => {
 };
 
 export const resolveApiBase = () => {
-  const base = toAbsoluteUrl(import.meta.env.VITE_API_URL, '/api/v1');
+  const tricysContext = readTricysContext();
+  const contextualApiBase = readSearchParam('apiBase') || tricysContext.apiBase || import.meta.env.VITE_API_URL;
+  const base = normalizeApiBase(toAbsoluteUrl(contextualApiBase, '/api/v1'));
   return /\/api\/v1$/.test(base) ? base : `${base}/api/v1`;
 };
 

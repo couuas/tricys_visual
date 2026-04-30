@@ -2,7 +2,7 @@
   <div 
     class="three-container" 
     ref="threeContainer"
-    :class="{ 'hide-labels': !showLabels, 'hide-values': !showValues }"
+        :class="{ 'hide-labels': !showLabels }"
   >
         <div v-if="Object.keys(modelProgressMap).length > 0" class="load-progress">
             <div class="load-progress-title">MODEL LOADING</div>
@@ -149,10 +149,9 @@ const emit = defineEmits(['selectComponent', 'groupContext', 'run-simulation', '
 const router = useRouter();
 
 const { 
-  simulationData, currentTime, isPlaying, stepTime, 
   modelConfig, annotations, loadModelConfig, loadAnnotations,
-  saveComponentPosition, getCurrentDataSlice, loadData,
-  componentParams, showLabels, showValues, alertRules,
+    saveComponentPosition,
+    componentParams, showLabels, alertRules,
   selectedConnectionId, connectionStyles, getConnectionStyle, defaultConnectionStyle,
   multiSelectedIds, toggleMultiSelect, componentGroups, expandedGroupId, getRenderParentId, isGroup, structureData,
     isExpanded, setExpandedGroup, isReadOnly, currentProjectId
@@ -210,7 +209,6 @@ const HOVER_DELAY = 400;
 
 const fluidMeshesMap = {}; 
 const customMeshesMap = {};
-const valueLabelsMap = {};
 const labelContainersMap = {};
 const componentGroupsMap = {}; 
 let connectionRegistry = []; 
@@ -742,10 +740,8 @@ const createSingleComponentVisual = (c, version) => {
 
     const div = document.createElement('div'); div.className = 'label-card';
     const nameDiv = document.createElement('div'); nameDiv.className = 'label-title'; nameDiv.textContent = c.id;
-    const valDiv = document.createElement('div'); valDiv.className = 'label-metric'; valDiv.textContent = '---';
-    div.appendChild(nameDiv); div.appendChild(valDiv);
+    div.appendChild(nameDiv);
     const l = new CSS2DObject(div); l.position.set(0, TANK_HEIGHT + 5, 0);
-    valueLabelsMap[sid] = valDiv; 
     labelContainersMap[sid] = div;
     g.add(l);
 
@@ -876,7 +872,6 @@ const buildScene = async (d) => {
   // 重置映射表
   for (const key in fluidMeshesMap) delete fluidMeshesMap[key];
   for (const key in customMeshesMap) delete customMeshesMap[key];
-  for (const key in valueLabelsMap) delete valueLabelsMap[key];
     for (const key in labelContainersMap) delete labelContainersMap[key];
   for (const key in componentGroupsMap) delete componentGroupsMap[key];
     for (const key in modelProgressMap) delete modelProgressMap[key];
@@ -1479,12 +1474,10 @@ const onPointerMove = (event) => {
                 hoverInfo.params = [];
                 hoverInfo.alertRule = null;
             } else {
-                const d = getCurrentDataSlice();
                 const cfg = modelConfig.value[id];
                 hoverInfo.visible = true;
                 hoverInfo.x = event.clientX + 15; hoverInfo.y = event.clientY + 15;
                 hoverInfo.id = id;
-                hoverInfo.value = d[id] !== undefined ? d[id].toFixed(1) : '---';
                 hoverInfo.type = (cfg && cfg.type === 'custom') ? 'Custom Model' : 'Default Tank';
                 hoverInfo.note = annotations.value[id] || '';
                 
@@ -1586,6 +1579,10 @@ const onDoubleClick = (event) => {
         if (expandedGroupId.value) setExpandedGroup(null);
     }
 };
+
+onUnmounted(() => {
+    if (hoverTimer) clearTimeout(hoverTimer);
+});
 
 const rebuildVisuals = () => {
     if (structureData.value) buildScene(structureData.value);
@@ -1696,40 +1693,6 @@ watch(() => [componentGroups.value, expandedGroupId.value, multiSelectedIds.valu
     rebuildVisuals();
 }, { deep: true });
 
-const updateVisuals = () => {
-  const d = getCurrentDataSlice();
-  for (const safeID in valueLabelsMap) {
-    const val = d[safeID];
-    const hasData = (val !== undefined);
-    let ratio = 0;
-    if (hasData) ratio = Math.max(0.0, Math.min(1.0, val / VISUAL_MAX_INVENTORY));
-    const fluid = fluidMeshesMap[safeID];
-    if (fluid) {
-      fluid.scale.y = hasData ? Math.max(0.02, ratio) : 0.5;
-      fluid.material.color.setHSL(hasData ? ratio * 0.6 : 0.55, 0.9, 0.5);
-      if(!hasData) fluid.material.color.setHex(0x00ccff);
-    }
-    const c = customMeshesMap[safeID];
-    if (c) {
-      c.traverse(ch => {
-        if (ch.isMesh && ch.material && ch.material.emissive) {
-          if(hasData) {
-             if (ch.userData.origEmissive) {
-                 ch.material.emissive.copy(ch.userData.origEmissive);
-                 ch.material.emissiveIntensity = ch.userData.origEmissiveIntensity;
-             } else {
-                 ch.material.emissive.setHex(0x000000);
-                 ch.material.emissiveIntensity = 0;
-             }
-          }
-        }
-      });
-    }
-    const label = valueLabelsMap[safeID];
-    if (label) label.textContent = hasData ? val.toFixed(1) : '';
-  }
-};
-
 const updateLabelVisibility = () => {
     if (!camera) return;
     Object.keys(componentGroupsMap).forEach((id) => {
@@ -1782,7 +1745,6 @@ const resolvePendingCustomLoads = (force = false) => {
 
 const animate = () => {
   reqId = requestAnimationFrame(animate);
-  if (isPlaying.value) stepTime(0.1);
     connectionRegistry.forEach(conn => {
             const mesh = conn.mesh;
             if (mesh && mesh.material && mesh.material.map) {
@@ -1808,7 +1770,6 @@ const animate = () => {
           }
       }
     });
-  updateVisuals();
     updateLabelVisibility();
     updateLOD();
     const now = performance.now();
@@ -1834,8 +1795,8 @@ onMounted(async () => {
   resizeObserver.observe(threeContainer.value);
   window.addEventListener('dblclick', onDoubleClick);
         loadSnapshotsFromStorage();
-  const structData = await loadData();
-    if (structData) { await buildScene(structData); animate(); } else { isLoading.value = false; }
+    const currentStructure = structureData.value;
+        if (currentStructure) { await buildScene(currentStructure); animate(); } else { isLoading.value = false; }
     undoStack.value = [];
     redoStack.value = [];
     canUndo.value = false;
@@ -1875,7 +1836,6 @@ defineExpose({ reloadComponent });
 /* [Changed 100vh to 100% to fit parent container] */
 .three-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; background: radial-gradient(circle at center, #11111a 0%, #000000 100%); overflow: hidden; z-index: 0; }
 .hide-labels :deep(.label-title) { display: none !important; }
-.hide-values :deep(.label-metric) { display: none !important; }
 .loading-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; z-index: 1000; }
 .loading-text { color: #00d2ff; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00d2ff; }
 .loading-sub { color: #888; font-size: 14px; margin-top: 5px; }
@@ -1929,7 +1889,6 @@ defineExpose({ reloadComponent });
 .params-section { margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); }
 :deep(.label-card) { text-align: center; text-shadow: none; transform: translateY(-100%); pointer-events: none; transition: opacity 0.3s; background: rgba(10, 15, 20, 0.9); border: 1px solid rgba(120, 170, 210, 0.35); border-radius: 6px; padding: 6px 8px; min-width: 90px; box-shadow: 0 2px 10px rgba(0,0,0,0.4); }
 :deep(.label-title) { font-size: 11px; color: #cfe6f7; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 2px; text-align: center; }
-:deep(.label-metric) { font-family: "Consolas", monospace; font-size: 13px; color: #8fe1ff; font-weight: 700; text-align: center; }
 :deep(.label-title.group) { background: rgba(35, 55, 75, 0.8); color: #cfe6f7; border: 1px solid rgba(120, 170, 210, 0.4); border-radius: 4px; padding: 2px 6px; display: inline-block; }
 
 /* --- Modern Floating Dock Toolbar inside 3D Scene --- */

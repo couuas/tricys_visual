@@ -81,6 +81,12 @@ const router = createRouter({
           name: 'visualizer',
           component: () => import('../views/Hdf5VisualizerView.vue'),
           meta: { requiresAuth: true }
+        },
+        {
+          path: 'model-editor',
+          name: 'model-editor',
+          component: () => import('../views/ModelEditorView.vue'),
+          meta: { requiresAuth: true }
         }
       ]
     },
@@ -89,7 +95,6 @@ const router = createRouter({
       name: 'admin',
       component: () => import('../views/AdminView.vue')
     },
-
     // Legacy Redirects
     { path: '/vis', redirect: '/monitor' },
   ]
@@ -142,7 +147,7 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // Project Context Guard
-    const projectPages = ['config', 'analysis', 'monitor', 'component-detail', 'pages', 'goview', 'visualizer'];
+    const projectPages = ['config', 'analysis', 'monitor', 'component-detail', 'pages', 'goview', 'visualizer', 'model-editor'];
 
     // Demo mode exception: 'config' route is used for demo but with separate name/path logic? 
     // Actually 'demo' route has name='demo'. 'config' route has name='config'. 

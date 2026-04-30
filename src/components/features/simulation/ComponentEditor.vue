@@ -122,49 +122,71 @@
 
       <div class="section-header-group">
          <div class="section-label">VISUAL SETTINGS</div>
-         <span class="unlocked-badge">✎ Editable</span>
-      </div>
-      
-      <div class="form-group">
-        <label>Description</label>
-        <textarea v-model="localNote" rows="2" :disabled="isReadOnly"></textarea>
+         <span :class="canEditVisualSettings ? 'unlocked-badge' : 'locked-badge'">
+           {{ canEditVisualSettings ? '✎ Editable' : 'Model Editor Only' }}
+         </span>
       </div>
 
-      <div class="form-group">
-        <label>Scale: {{ localConfig.scale?.toFixed(1) }}</label>
-        <input type="range" min="0.1" max="50.0" step="0.1" v-model.number="localConfig.scale" :disabled="isReadOnly" />
-      </div>
-
-      <div class="form-group">
-        <div class="row-space-between">
-          <label>3D Model Asset</label>
-          <div class="badge" :class="localConfig.type">{{ localConfig.type }}</div>
+      <template v-if="canEditVisualSettings">
+        <div class="form-group">
+          <label>Description</label>
+          <textarea v-model="localNote" rows="2" :disabled="isReadOnly"></textarea>
         </div>
-        <div class="model-selector" ref="modelSelectorRef">
-          <div class="custom-select-trigger" :class="{ active: showModelDropdown, disabled: isReadOnly }" @click="!isReadOnly && toggleModelDropdown()">
-            <span class="selected-text">{{ currentModelName }}</span>
-            <span class="dropdown-arrow">▼</span>
+
+        <div class="form-group">
+          <label>Scale: {{ localConfig.scale?.toFixed(1) }}</label>
+          <input type="range" min="0.1" max="50.0" step="0.1" v-model.number="localConfig.scale" :disabled="isReadOnly" />
+        </div>
+
+        <div class="form-group">
+          <div class="row-space-between">
+            <label>3D Model Asset</label>
+            <div class="badge" :class="localConfig.type">{{ localConfig.type }}</div>
           </div>
-          <transition name="dropdown-fade">
-            <div v-if="showModelDropdown" class="custom-dropdown-menu">
-              <div class="dropdown-item" :class="{ selected: selectedModelUrl === '' }" @click="selectModel('')"><span class="item-icon">🧊</span> Use Default Geometry</div>
-              <div class="dropdown-divider" v-if="libraryModels.length > 0"></div>
-              <div class="dropdown-label" v-if="libraryModels.length > 0">LIBRARY MODELS</div>
-              <div v-for="m in libraryModels" :key="m.url" class="dropdown-item" :class="{ selected: selectedModelUrl === m.url }" @click="selectModel(m.url)"><span class="item-icon">📦</span> {{ m.name }}</div>
-              <div v-if="libraryModels.length === 0" class="dropdown-empty">No models in library</div>
+          <div class="model-selector" ref="modelSelectorRef">
+            <div class="custom-select-trigger" :class="{ active: showModelDropdown, disabled: isReadOnly }" @click="!isReadOnly && toggleModelDropdown()">
+              <span class="selected-text">{{ currentModelName }}</span>
+              <span class="dropdown-arrow">▼</span>
             </div>
-          </transition>
-          <button class="icon-btn upload" @click="triggerUpload" :disabled="isReadOnly" title="Upload Project Model"><span v-if="!isUploading">⬆</span><span v-else class="spinner">⟳</span></button>
+            <transition name="dropdown-fade">
+              <div v-if="showModelDropdown" class="custom-dropdown-menu">
+                <div class="dropdown-item" :class="{ selected: selectedModelUrl === '' }" @click="selectModel('')"><span class="item-icon">🧊</span> Use Default Geometry</div>
+                <div class="dropdown-divider" v-if="libraryModels.length > 0"></div>
+                <div class="dropdown-label" v-if="libraryModels.length > 0">LIBRARY MODELS</div>
+                <div v-for="m in libraryModels" :key="m.url" class="dropdown-item" :class="{ selected: selectedModelUrl === m.url }" @click="selectModel(m.url)"><span class="item-icon">📦</span> {{ m.name }}</div>
+                <div v-if="libraryModels.length === 0" class="dropdown-empty">No models in library</div>
+              </div>
+            </transition>
+            <button class="icon-btn upload" @click="triggerUpload" :disabled="isReadOnly" title="Upload Project Model"><span v-if="!isUploading">⬆</span><span v-else class="spinner">⟳</span></button>
+          </div>
+          <input type="file" ref="fileInput" accept=".glb" style="display:none" @change="handleUploadModel" />
         </div>
-        <input type="file" ref="fileInput" accept=".glb" style="display:none" @change="handleUploadModel" />
-      </div>
+      </template>
+
+      <template v-else>
+        <div class="visual-readonly-card">
+          <div class="visual-readonly-row">
+            <span class="visual-readonly-label">Description</span>
+            <span class="visual-readonly-value">{{ localNote || 'Not set' }}</span>
+          </div>
+          <div class="visual-readonly-row">
+            <span class="visual-readonly-label">Scale</span>
+            <span class="visual-readonly-value">{{ localConfig.scale?.toFixed(1) || '1.0' }}</span>
+          </div>
+          <div class="visual-readonly-row">
+            <span class="visual-readonly-label">3D Asset</span>
+            <span class="visual-readonly-value">{{ currentModelName }}</span>
+          </div>
+          <div class="visual-readonly-hint">Visual configuration is managed in ModelEditorShell and is not editable from ConfigView.</div>
+        </div>
+      </template>
 
       <div style="height: 20px;"></div>
     </div>
 
     <div v-if="selectedId" class="actions">
       <button class="btn primary" @click="saveAll" :disabled="isReadOnly">
-          {{ isReadOnly ? 'Read Only' : (hasSimulationData ? 'Save Visuals' : 'Save All Changes') }}
+          {{ primaryActionLabel }}
       </button>
       <button 
         class="btn secondary" 
@@ -276,6 +298,13 @@ const showModelDropdown = ref(false);
 const modelSelectorRef = ref(null);
 
 const currentGroupChildren = ref([]);
+const canEditVisualSettings = computed(() => !props.embedded);
+
+const primaryActionLabel = computed(() => {
+  if (isReadOnly.value) return 'Read Only';
+  if (hasSimulationData.value) return canEditVisualSettings.value ? 'Save Visuals' : 'Save Settings';
+  return 'Save All Changes';
+});
 
 onMounted(() => { fetchLibraryModels(); window.addEventListener('click', closeDropdownOnClickOutside); });
 onUnmounted(() => { window.removeEventListener('click', closeDropdownOnClickOutside); });
@@ -723,6 +752,12 @@ input[type="range"] { width: 100%; cursor: pointer; accent-color: #00d2ff; }
 .btn.secondary { background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2); }
 .btn.secondary:hover:not(:disabled) { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.4); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(100%); }
+.visual-readonly-card { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+.visual-readonly-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.visual-readonly-row:last-of-type { border-bottom: none; }
+.visual-readonly-label { font-size: 11px; color: #7a8796; }
+.visual-readonly-value { font-size: 12px; color: #dfe9f5; text-align: right; word-break: break-word; }
+.visual-readonly-hint { margin-top: 12px; font-size: 11px; line-height: 1.5; color: #8e9dad; }
 .model-selector { display: flex; gap: 8px; position: relative; }
 .custom-select-trigger { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; }
 .custom-select-trigger:hover { border-color: #00d2ff; background: rgba(0, 210, 255, 0.05); }

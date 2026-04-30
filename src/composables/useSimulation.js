@@ -1,30 +1,19 @@
 import { ref, reactive, computed } from 'vue';
 import { projectApi } from '../api/project';
 import { taskApi } from '../api/task';
+import { useAnalysisWorkbenchStore } from '../stores/analysisWorkbench.store';
+import { useSimulationSessionStore } from '../stores/simulationSession.store';
 import { useAuth } from './useAuth';
 import { resolveApiBase, resolveBackendBase } from '../utils/runtimeUrls';
 
 // --- 全局单例状态 (Global State) ---
 const isReadOnly = ref(false);
-const simulationData = ref(null);
 const structureData = ref(null);
 const componentParams = ref([]);
 const defaultParams = ref([]);
 const modelConfig = ref({});
 const annotations = ref({});
 const libraryModels = ref([]);
-const filterSchema = ref([]);
-
-const currentTime = ref(0);
-const isPlaying = ref(false);
-const simulationStep = ref(0.5);
-const maxTime = ref(100);
-
-const alertRules = ref({});
-const activeAlert = ref(null);
-const ignoredComponents = reactive(new Set());
-
-const lastSimConfig = ref(null);
 
 const selectedConnectionId = ref(null);
 const connectionStyles = ref({});
@@ -32,17 +21,6 @@ const defaultConnectionStyle = {
   color: '#FFD700', type: 'flow', speed: 1.0, opacity: 0.9, width: 4.0
 };
 const CONNECTION_STYLES_KEY = '__connection_styles__';
-
-const analysisTasks = ref([]);
-const currentAnalysisTask = ref(null);
-
-const hasSimulationData = ref(false);
-const showDashboard = ref(true);
-const showLabels = ref(true);
-const showValues = ref(true);
-const userPrefersDashboard = ref(true);
-const showAnalysisPanel = ref(false);
-const isDashboardMode = ref(false);
 
 const multiSelectedIds = ref(new Set());
 const componentGroups = ref({});
@@ -54,28 +32,36 @@ const currentProjectId = ref(localStorage.getItem('tricys_last_pid') || null);
 const currentProject = ref(null);
 const currentTaskId = ref(null);
 
-let timer = null;
-
 export function useSimulation() {
+  const {
+    activeAlert,
+    alertRules,
+    clearResults: clearSimulationResults,
+    currentTime,
+    filterSchema,
+    hasSimulationData,
+    ignoredComponents,
+    lastSimConfig,
+    normalizeFilterSchema,
+    resetSimulationSession,
+    showDashboard,
+    showLabels,
+    simulationData,
+    toggleDashboardPref,
+    updateDashboardVisibility,
+    userPrefersDashboard
+  } = useSimulationSessionStore();
 
-  const normalizeFilterSchema = (rules) => {
-    if (!Array.isArray(rules)) return [];
-    return rules
-      .map(rule => {
-        const columns = Array.isArray(rule?.columns)
-          ? rule.columns.filter(column => typeof column === 'string' && column.trim())
-          : [];
-        const normalized = { columns };
-        if (rule?.min !== undefined && rule?.min !== null && rule.min !== '') {
-          normalized.min = Number(rule.min);
-        }
-        if (rule?.max !== undefined && rule?.max !== null && rule.max !== '') {
-          normalized.max = Number(rule.max);
-        }
-        return normalized;
-      })
-      .filter(rule => rule.columns.length > 0 && (rule.min !== undefined || rule.max !== undefined));
-  };
+  const {
+    analysisTasks,
+    closeAnalysisDashboard: closeWorkbenchAnalysisDashboard,
+    currentAnalysisTask,
+    isDashboardMode,
+    openAnalysisDashboard: openWorkbenchAnalysisDashboard,
+    resetAnalysisWorkbench,
+    showAnalysisPanel,
+    toggleDashboardMode: toggleWorkbenchDashboardMode
+  } = useAnalysisWorkbenchStore();
 
   const unflattenAndNormalize = (inputData) => {
     const nested = {};
@@ -175,7 +161,6 @@ export function useSimulation() {
       if (rule.operator === '<' && val < rule.threshold) triggered = true;
       else if (rule.operator === '>' && val > rule.threshold) triggered = true;
       if (triggered) {
-        pause();
         activeAlert.value = { id: compId, time: currentTime.value.toFixed(2), value: val.toFixed(4), rule: `${rule.operator} ${rule.threshold}` };
         break;
       }
@@ -197,7 +182,7 @@ export function useSimulation() {
         if (rule.operator === '<' && val < rule.threshold) triggered = true;
         else if (rule.operator === '>' && val > rule.threshold) triggered = true;
         if (triggered) {
-          pause(); currentTime.value = timeArr[i];
+          currentTime.value = timeArr[i];
           activeAlert.value = { id: compId, time: timeArr[i].toFixed(2), value: val.toFixed(4), rule: `${rule.operator} ${rule.threshold}` };
           return;
         }
@@ -244,8 +229,6 @@ export function useSimulation() {
     if (!pid) return null;
 
     try {
-      pause();
-
       // 1. Get Project Details (includes Structure)
       const project = await projectApi.getProject(pid);
       currentProject.value = project;
@@ -300,19 +283,18 @@ export function useSimulation() {
           if (data.components) { for (let key in data.components) processedComponents[key.toLowerCase()] = data.components[key]; }
           simulationData.value = { time: data.time || [], components: processedComponents };
           hasSimulationData.value = true;
-          if (data.time && data.time.length > 0) { maxTime.value = data.time[data.time.length - 1]; currentTime.value = 0; } else { maxTime.value = 100; }
+          currentTime.value = 0;
         } else {
           throw new Error("No data");
         }
-      } catch (e) { hasSimulationData.value = false; simulationData.value = null; maxTime.value = 100; }
+      } catch (e) { hasSimulationData.value = false; simulationData.value = null; }
 
       // 4. Run Config
       try {
         const cfg = await projectApi.getRunConfig(pid);
         lastSimConfig.value = cfg;
         filterSchema.value = normalizeFilterSchema(cfg?.filter_schema);
-        if (cfg.simulation && cfg.simulation.step_size) simulationStep.value = parseFloat(cfg.simulation.step_size);
-      } catch (e) { lastSimConfig.value = null; filterSchema.value = []; simulationStep.value = 0.5; }
+      } catch (e) { lastSimConfig.value = null; filterSchema.value = []; }
 
       // 5. UI State
       await loadAlertRules(pid);
@@ -375,22 +357,16 @@ export function useSimulation() {
     await saveFilterSchema(nextRules);
   };
 
-  const play = () => { if (isPlaying.value) return; isPlaying.value = true; if (timer) clearInterval(timer); timer = setInterval(() => { stepTime(simulationStep.value); }, 1000); };
-  const pause = () => { isPlaying.value = false; if (timer) { clearInterval(timer); timer = null; } };
-  const togglePlay = () => { if (isPlaying.value) pause(); else play(); };
-  const stepTime = (delta) => { if (!simulationData.value) return; let t = currentTime.value + delta; t = Math.round(t * 1000) / 1000; if (t >= maxTime.value) { t = maxTime.value; pause(); } if (t < 0) t = 0; currentTime.value = t; checkAlerts(); };
-  const setTime = (t) => { if (!simulationData.value) { currentTime.value = t; return; } if (t > maxTime.value) t = maxTime.value; if (t < 0) t = 0; const step = simulationStep.value; if (step > 0) { t = Math.round(t / step) * step; t = Math.round(t * 1000) / 1000; } currentTime.value = t; checkAlerts(); };
-
   const resetSession = async () => {
     // Backend is stateless now, no need to call /api/session/clear
     // try { await fetch(`${BACKEND_URL}/api/session/clear`, { method: 'POST' }); } catch(e) {}
-    pause(); currentTime.value = 0; maxTime.value = 100;
-    simulationData.value = null; structureData.value = null; hasSimulationData.value = false;
+    resetSimulationSession();
+    structureData.value = null;
     currentProject.value = null;
     modelConfig.value = {}; annotations.value = {}; componentParams.value = []; defaultParams.value = [];
-    lastSimConfig.value = null; filterSchema.value = []; activeAlert.value = null; ignoredComponents.clear(); alertRules.value = {};
     selectedConnectionId.value = null; connectionStyles.value = {}; currentAnalysisTask.value = null;
     multiSelectedIds.value.clear(); componentGroups.value = {}; expandedGroupId.value = null;
+    resetAnalysisWorkbench();
 
     graphSelectedIds.value = new Set(['sds', 'plasma', 'tes']);
   };
@@ -463,33 +439,15 @@ export function useSimulation() {
       }
     }
   };
-  const getCurrentDataSlice = () => {
-    if (!simulationData.value || !simulationData.value.time) return {};
-    let idx = -1; const target = currentTime.value; const timeArr = simulationData.value.time; let minDiff = Infinity;
-    for (let i = 0; i < timeArr.length; i++) {
-      const diff = Math.abs(timeArr[i] - target);
-      if (diff < 0.001) { idx = i; break; }
-      if (diff < minDiff) { minDiff = diff; idx = i; }
-    }
-    const slice = {};
-    for (const [key, vals] of Object.entries(simulationData.value.components)) {
-      slice[key] = vals[idx];
-    }
-    return slice;
-  };
-
   const clearResults = async () => {
     // Backend is stateless, no need to call /api/session/clear_results
     // try { await fetch(`${BACKEND_URL}/api/session/clear_results`, { method: 'POST' }); } catch (e) {}
-    pause(); hasSimulationData.value = false; simulationData.value = null; currentTime.value = 0; showLabels.value = true; lastSimConfig.value = null; activeAlert.value = null; ignoredComponents.clear(); updateDashboardVisibility();
+    clearSimulationResults();
   };
   /* Fixed BACKEND_URL def */
   const API_BASE = resolveApiBase();
   const BACKEND_URL = resolveBackendBase();
   const fetchLibraryModels = async () => { try { const res = await fetch(`${BACKEND_URL}/api/v1/library/models`); if (res.ok) libraryModels.value = await res.json(); } catch (e) { console.error('Failed to fetch library models:', e); } };
-  const updateDashboardVisibility = () => { if (!hasSimulationData.value) { showDashboard.value = false; return; } const width = window.innerWidth; if (width < 800) showDashboard.value = false; else showDashboard.value = userPrefersDashboard.value; };
-  const toggleDashboardPref = (val) => { userPrefersDashboard.value = val; showDashboard.value = val; };
-
   const fetchAnalysisTasks = async () => { try { const res = await fetch(`${BACKEND_URL}/api/analysis/tasks`); if (res.ok) analysisTasks.value = await res.json(); } catch (e) { console.error("Fetch tasks failed", e); } };
   const submitAnalysisTask = async (config) => {
     try { const res = await fetch(`${BACKEND_URL}/api/analysis/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) }); if (!res.ok) throw new Error("Submit failed"); await fetchAnalysisTasks(); return true; } catch (e) {
@@ -506,9 +464,18 @@ export function useSimulation() {
   const getTaskLogs = async (id) => { try { const res = await fetch(`${BACKEND_URL}/api/analysis/tasks/${id}/logs`); if (res.ok) { const data = await res.json(); return data.logs; } } catch (e) { } return ""; };
   const getTaskReport = async (id) => { try { const res = await fetch(`${BACKEND_URL}/api/analysis/tasks/${id}/report`); if (res.ok) { const data = await res.json(); return data.content; } } catch (e) { console.error("Fetch report failed", e); } return ""; };
 
-  const toggleDashboardMode = () => { isDashboardMode.value = !isDashboardMode.value; showDashboard.value = true; };
-  const openAnalysisDashboard = (task) => { currentAnalysisTask.value = task; showAnalysisPanel.value = false; showDashboard.value = false; };
-  const closeAnalysisDashboard = () => { currentAnalysisTask.value = null; showDashboard.value = true; showAnalysisPanel.value = true; };
+  const toggleDashboardMode = () => {
+    toggleWorkbenchDashboardMode();
+    showDashboard.value = true;
+  };
+  const openAnalysisDashboard = (task) => {
+    openWorkbenchAnalysisDashboard(task);
+    showDashboard.value = false;
+  };
+  const closeAnalysisDashboard = () => {
+    closeWorkbenchAnalysisDashboard();
+    showDashboard.value = true;
+  };
 
   const toggleMultiSelect = (id) => { const newSet = new Set(multiSelectedIds.value); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } multiSelectedIds.value = newSet; };
   const clearSelection = () => { multiSelectedIds.value.clear(); };
@@ -627,9 +594,9 @@ export function useSimulation() {
     // State
     currentProjectId, currentProject, currentTaskId, isReadOnly,
     simulationData, structureData, componentParams, defaultParams, modelConfig, annotations,
-    currentTime, isPlaying, hasSimulationData, maxTime,
-    showDashboard, showLabels, showValues, userPrefersDashboard,
-    libraryModels, modifiedParams, lastSimConfig, simulationStep, filterSchema,
+    hasSimulationData,
+    showDashboard, showLabels, userPrefersDashboard,
+    libraryModels, modifiedParams, lastSimConfig, filterSchema,
     alertRules, activeAlert, analysisTasks, showAnalysisPanel,
     selectedConnectionId, connectionStyles,
     isDashboardMode, currentAnalysisTask,
@@ -639,9 +606,8 @@ export function useSimulation() {
 
     // Methods
     loadData, loadModelConfig, loadAnnotations, resetSession, revertParam, updateParam,
-    play, pause, setTime, stepTime, togglePlay,
     saveParameters, saveAnnotations, saveComponentPosition, saveAlertRules, saveFilterSchema, saveComponentFilterRule, ignoreAlert, confirmAlert,
-    getCurrentDataSlice, clearResults, updateDashboardVisibility, fetchLibraryModels, toggleDashboardPref,
+    clearResults, updateDashboardVisibility, fetchLibraryModels, toggleDashboardPref,
     fetchAnalysisTasks, submitAnalysisTask, deleteAnalysisTask, getTaskLogs, getTaskReport,
     getConnectionStyle, updateConnectionStyle, syncAllConnections,
     toggleDashboardMode, openAnalysisDashboard, closeAnalysisDashboard,

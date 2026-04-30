@@ -30,101 +30,46 @@
         :style="{ height: `calc(100% - ${terminalHeight}px)` }"
       >
          <transition name="fade" mode="out-in">
-           <ThreeScene 
+           <ModelSceneAsset
              v-if="isReady" 
-             key="3d-scene"
-             ref="sceneRef" 
-             :isSimulating="isSimulating"
-             @selectComponent="handleSelect" 
-             @run-simulation="handleSimButtonClick"
-             @run-analysis="router.push({ name: 'analysis', query: { projectId: router.currentRoute.value.query.projectId } })"
-             @clear-parameters="handleResetParameters"
+             key="embedded-model-scene"
+             ref="sceneAssetRef"
+             :project-id="currentProjectId || router.currentRoute.value.query.projectId || ''"
+             mode="view"
+             :structure-data="structureData || { components: [], connections: [] }"
+             :model-config="modelConfig"
+             :annotations="annotations"
+             :component-groups="componentGroups"
+             :expanded-group-id="expandedGroupId"
+             :get-connection-style="getConnectionStyle"
+             :multi-selected-ids="multiSelectedIds"
+             :is-read-only="true"
+             @selectComponent="handleSelectComponent"
+             @selectConnection="handleSelectConnection"
+             @doubleClickComponent="handleOpenComponentDetail"
            />
          </transition>
-         
-         <div class="scene-sidebar" :class="{ open: isSidebarOpen }">
-            
-            <div class="sidebar-centered-block">
-                
-                <div class="sidebar-handle" @click="isSidebarOpen = !isSidebarOpen" title="Toggle Component List">
-                  <span class="handle-icon">{{ isSidebarOpen ? '◀' : '▶' }}</span>
-                </div>
-
-                <div class="sidebar-header">
-                   <span class="sb-title">SYSTEM MODULES</span>
-                   <div class="sb-controls">
-                     <span class="sb-count" :class="{ editing: isSidebarEditMode }">
-                        {{ sidebarDisplayList.length }}
-                     </span>
-                     <button 
-                       class="sb-edit-btn" 
-                       :class="{ active: isSidebarEditMode }"
-                       @click="!isReadOnly && (isSidebarEditMode = !isSidebarEditMode)"
-                       :disabled="isReadOnly"
-                       :title="isReadOnly ? 'Read Only' : (isSidebarEditMode ? 'Finish Editing' : 'Edit List')"
-                     >
-                       <span class="icon">{{ isSidebarEditMode ? '✓' : '⚙' }}</span>
-                     </button>
-                   </div>
-                </div>
-
-                <div class="sidebar-list custom-scroll" :class="{ 'edit-mode': isSidebarEditMode }">
-                   <div class="sidebar-scroll-wrapper">
-                       <div class="timeline-line"></div> 
-                       
-                       <div 
-                         v-for="(comp, index) in sidebarDisplayList" 
-                         :key="comp.id" 
-                         class="tech-tab-item"
-                         :class="{ 
-                           active: selectedId === comp.id && !isSidebarEditMode,
-                           hidden: hiddenComponents.has(comp.id),
-                           'in-edit': isSidebarEditMode
-                         }"
-                         :style="{ '--delay': index * 0.05 + 's' }"
-                         @click="handleSidebarItemClick(comp.id)"
-                       >
-                         <div class="tech-indicator">
-                            <span v-if="isSidebarEditMode" class="eye-icon">
-                              {{ hiddenComponents.has(comp.id) ? '✕' : '👁' }}
-                            </span>
-                            <div v-else class="tech-dot"></div>
-                         </div>
-                         <div class="tech-hex">
-                            <span class="hex-text">{{ comp.id.slice(0,3).toUpperCase() }}</span>
-                         </div>
-                         <div class="tech-bar">
-                            <span class="bar-text">{{ comp.id.toUpperCase() }}</span>
-                            <span class="bar-status" v-if="isSidebarEditMode">
-                              {{ hiddenComponents.has(comp.id) ? 'HIDDEN' : 'VISIBLE' }}
-                            </span>
-                            <span class="bar-sub" v-else>System</span>
-                         </div>
-                       </div>
-                       
-                       <div v-if="sidebarDisplayList.length === 0" class="empty-list">
-                         {{ isSidebarEditMode ? 'No components found' : 'All components hidden' }}
-                       </div>
-                   </div>
-                </div>
-            </div>
-         </div>
 
          <transition name="fade-up">
-            <div v-if="multiSelectedIds.size > 1" class="group-actions-bar">
-              <div class="selection-info">
-                <span class="count">{{ multiSelectedIds.size }}</span>
-                <span class="label">selected</span>
-              </div>
-              <div class="actions-row">
-                <button class="action-btn primary" @click.stop="handleMergeGroup">
-                  <span class="icon">🔗</span> Merge Group
-                </button>
-                <button class="action-btn secondary" @click.stop="clearSelection">
-                  Cancel
-                </button>
-              </div>
-            </div>
+           <div v-if="isReady && !isDashboardMode" class="scene-action-overlay">
+             <button class="run-btn" :disabled="isSimulating" @click="handleSimButtonClick">
+               <span class="icon">▶</span>
+               {{ simButtonText }}
+             </button>
+             <button v-if="!hasSimulationData" class="overlay-btn secondary" @click="handleResetParameters">
+               Reset Params
+             </button>
+           </div>
+         </transition>
+
+         <!-- [NEW] Editor Entry Point -->
+         <transition name="fade-up">
+           <div class="editor-entry-overlay" v-if="isReady && !isSimulating && !isDashboardMode">
+             <button class="editor-entry-btn" :class="{'btn-readonly': isReadOnly}" @click="openModelEditor">
+                <span class="icon">🛠</span> Open 3D Studio (Alpha)
+                <span v-if="isReadOnly" class="ro-badge">View Only</span>
+             </button>
+           </div>
          </transition>
       </div>
 
@@ -142,43 +87,18 @@
         v-if="hasRightPanelContent"
         :style="{ height: `calc(100% - ${terminalHeight}px)`, width: layoutState.rightWidth + 'px' }"
       >
-         <div class="right-split-container">
-            <div 
-              v-if="selectedId" 
-              class="split-top" 
-              :class="{ 'flex-fill': !selectedConnectionId }"
-              :style="!selectedConnectionId ? {} : { height: layoutState.rightTopHeight + 'px' }"
-            >
-               <ComponentEditor 
-                 :selectedId="selectedId" 
-                 :embedded="true" 
-                 :allowClose="true"
-                 @close="selectedId = null" 
-                 @close-panel="selectedId = null"
-                 @update="handleConfigUpdate" 
-               />
-            </div>
-            
-            <div 
-              v-if="selectedId && selectedConnectionId" 
-              class="split-resizer" 
-              @mousedown="startResize('right-split', $event)"
-            >
-               <div class="resizer-handle"></div>
-            </div>
-
-            <div 
-              v-if="selectedConnectionId"
-              class="split-bottom"
-            >
-               <ConnectionEditor 
-                 :embedded="true" 
-                 :allowClose="true"
-                 @close="selectedConnectionId = null" 
-                 @close-panel="selectedConnectionId = null"
-               />
-            </div>
-         </div>
+        <div class="right-split-container">
+          <div class="split-top flex-fill">
+            <ComponentEditor 
+              :selectedId="selectedId" 
+              :embedded="true" 
+              :allowClose="true"
+              @close="selectedId = null" 
+              @close-panel="selectedId = null"
+              @update="handleConfigUpdate"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -222,9 +142,8 @@ import { $confirm } from '../utils/dialog';
 import { $notify, $updateNotification, closeNotification } from '../utils/notification';
 import { taskApi } from '../api/task'; 
 
-import ThreeScene from '../components/features/simulation/ThreeScene.vue';
+import ModelSceneAsset from '../components/workbench/ModelSceneAsset.vue';
 import ComponentEditor from '../components/features/simulation/ComponentEditor.vue';
-import ConnectionEditor from '../components/features/simulation/ConnectionEditor.vue';
 import SimulationConfigModal from '../components/features/simulation/SimulationConfigModal.vue'; 
 import AnalysisConfigModal from '../components/features/simulation/AnalysisConfigModal.vue'; // [NEW]
 import FocWorkbenchPanel from '../components/features/simulation/FocWorkbenchPanel.vue';
@@ -233,25 +152,24 @@ import { resolveBackendBase } from '../utils/runtimeUrls';
 
 const props = defineProps({ mode: { type: String, default: 'normal' } });
 const router = useRouter();
-const selectedId = ref(null);
-const sceneRef = ref(null);
-
 const {
   resetSession, updateDashboardVisibility, hasSimulationData, loadData, clearResults,
-  modelConfig, modifiedParams, lastSimConfig, loadModelConfig,
-  showLabels, showValues, alertRules, activeAlert, ignoreAlert, confirmAlert,
+  modelConfig, annotations, modifiedParams, lastSimConfig, loadModelConfig,
+  showLabels, alertRules, activeAlert, ignoreAlert, confirmAlert,
   isDashboardMode, toggleDashboardMode: _toggleDashboardMode,
   selectedConnectionId, isExpanded, setExpandedGroup,
   multiSelectedIds, createGroup, dissolveGroup, clearSelection,
-  structureData,
+  structureData, componentGroups, expandedGroupId,
   componentParams, defaultParams,
   fetchHiddenComponents,
   saveHiddenComponents, isReadOnly, revertParam, updateParam,
-  currentProjectId
+  currentProjectId, getConnectionStyle
 } = useSimulation();
 
 const isFullscreen = ref(false);
 const isEditorMode = ref(false);
+const selectedId = ref(null);
+const sceneAssetRef = ref(null);
 
 const showSimSettingsModal = ref(false);
 const showAnalysisModal = ref(false); // [NEW]
@@ -346,7 +264,7 @@ const handleSidebarItemClick = async (compId) => {
   }
 };
 
-const hasRightPanelContent = computed(() => !!selectedId.value || !!selectedConnectionId.value);
+const hasRightPanelContent = computed(() => !!selectedId.value);
 const terminalLeftOffset = computed(() => {
     return 0;
 });
@@ -391,8 +309,6 @@ const startResize = (direction, event) => {
   document.body.style.userSelect = 'none'; document.body.style.cursor = direction === 'right-split' ? 'row-resize' : 'col-resize';
 };
 
-watch(selectedId, (newVal) => { if (newVal && !isDashboardMode.value) selectedConnectionId.value = null; });
-watch(selectedConnectionId, (newVal) => { if (newVal && !isDashboardMode.value) selectedId.value = null; });
 // watch(lastSimConfig, ...) -> Logic moved to child component but we can keep global watcher or just let onShow handle it
 
 watch(
@@ -483,7 +399,6 @@ const handleUpload = async (event) => {
 };
 
 const toggleDashboardMode = () => { _toggleDashboardMode(); };
-const handleMergeGroup = () => { if (multiSelectedIds.value.size < 2) return; const groupName = prompt("Enter name for the new group:", `System Group ${Math.floor(Math.random() * 100)}`); if (groupName) createGroup(groupName); };
 const onGlobalClick = () => closeSettingsMenu();
 const flatModifiedParams = computed(() => { const list = []; if (!modifiedParams.value) return list; for (const [compId, params] of Object.entries(modifiedParams.value)) { for (const [key, val] of Object.entries(params)) { const displayKey = key.startsWith(compId + '.') ? key : `${compId}.${key}`; list.push({ compId, key, displayKey, value: val }); } } return list; });
 const hasModifiedParams = computed(() => flatModifiedParams.value.length > 0);
@@ -561,8 +476,33 @@ const navigateTo = (viewName) => {
   }
   currentView.value = viewName;
 };
-const handleSelect = (id) => { selectedId.value = id; };
-const handleConfigUpdate = () => { if (selectedId.value && sceneRef.value) sceneRef.value.reloadComponent(selectedId.value); };
+const openModelEditor = () => {
+    const pid = currentProjectId.value || router.currentRoute.value.query.projectId;
+    if (pid) {
+        router.push({ name: 'model-editor', query: { projectId: pid, mode: isReadOnly.value ? 'view' : 'edit', from: 'config' } });
+    }
+};
+const handleSelectComponent = (id) => {
+  selectedId.value = id || null;
+  selectedConnectionId.value = null;
+};
+const handleSelectConnection = (id) => {
+  selectedConnectionId.value = id || null;
+  selectedId.value = null;
+};
+const handleConfigUpdate = () => {
+  if (!selectedId.value || !sceneAssetRef.value?.focusCameraOn) return;
+  sceneAssetRef.value.focusCameraOn(selectedId.value);
+};
+const handleOpenComponentDetail = (id) => {
+  if (!id) return;
+  const projectId = currentProjectId.value || router.currentRoute.value.query.projectId;
+  router.push({
+    name: 'component-detail',
+    params: { id },
+    query: projectId ? { projectId } : undefined
+  });
+};
 const handleResize = () => updateDashboardVisibility();
 
 onMounted(() => {
@@ -582,6 +522,78 @@ onUnmounted(() => {
 <style scoped>
 /* Base Styles */
 .vis-view { position: relative; width: 100%; height: 100%; overflow: hidden; background: #05070a; display: flex; flex-direction: column; font-family: 'Inter', 'Roboto Mono', sans-serif; }
+
+/* [NEW] Editor Entry Styles */
+.editor-entry-overlay {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 50;
+}
+.scene-action-overlay {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.editor-entry-btn {
+    background: linear-gradient(135deg, #00d2ff, #007bff);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    color: #000;
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3);
+    transition: all 0.2s;
+}
+.editor-entry-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4);
+}
+.editor-entry-btn.btn-readonly {
+    background: linear-gradient(135deg, #444, #666);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.editor-entry-btn.btn-readonly:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.ro-badge {
+    background: #222;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    margin-left: 5px;
+    color: #ccc;
+}
+.overlay-btn {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(8, 12, 18, 0.88);
+  color: #d3deea;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.overlay-btn:hover {
+  border-color: rgba(0, 210, 255, 0.4);
+  color: #fff;
+  background: rgba(12, 18, 26, 0.96);
+}
+.overlay-btn.secondary {
+  color: #9eb0c4;
+}
 
 /* Tabs */
 .sim-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #30363d; padding-bottom: 0px; }
@@ -627,10 +639,6 @@ onUnmounted(() => {
   transition: all 0.2s;
   letter-spacing: 0.5px;
 }
-    flex: 0 0 auto;
-    height: auto;
-    min-height: 0;
-    max-height: none;
 
 .icon-btn {
   background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #888;
