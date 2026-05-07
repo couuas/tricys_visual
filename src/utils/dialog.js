@@ -1,5 +1,5 @@
 import { createVNode, render } from 'vue';
-import ConfirmDialog from '../components/common/ConfirmDialog.vue';
+import ConfirmDialog from '../shared/ui/components/ConfirmDialog.vue';
 
 // 创建挂载容器
 const container = document.createElement('div');

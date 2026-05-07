@@ -47,6 +47,13 @@ const createDashTexture = () => {
     return texture;
 };
 
+const resolveConnectionScrollSpeed = (speed, type = 'flow') => {
+    const fallback = type === 'dashed' ? 0.015 : 0.04;
+    const numericSpeed = Number(speed);
+    if (!Number.isFinite(numericSpeed) || numericSpeed <= 0) return fallback;
+    return numericSpeed <= 0.08 ? numericSpeed : numericSpeed * fallback;
+};
+
 const createRibbonGeometry = (curve, width, segments = 64) => {
     const points = curve.getPoints(segments);
     const positions = []; const uvs = []; const indices = [];
@@ -91,7 +98,7 @@ export class TopologySceneEngine {
             multiSelectedIds: new Set(),
             isGroup: (id) => false, // Callback to check if group
             BACKEND_URL: '', // [NEW] Used for resolving custom loader endpoints
-            getConnectionStyle: (id) => ({ width: 4.0, type: 'flow', color: 0x00d2ff, speed: 0.04, opacity: 0.8 }),
+            getConnectionStyle: (id) => ({ width: 4.0, type: 'flow', color: 0x00d2ff, speed: 0.1, opacity: 0.8 }),
             ...config
         };
 
@@ -246,13 +253,14 @@ export class TopologySceneEngine {
     }
 
     updateLoop() {
-        // Handle visual effects (like flowing connections if implemented)
+        // Handle animated connection textures.
         this.connectionRegistry.forEach(c => {
             if (c.mesh && c.mesh.material && c.mesh.material.map) {
+                const scrollSpeed = c.mesh.userData.scrollSpeed || resolveConnectionScrollSpeed(c.mesh.userData.speed, c.mesh.userData.type);
                 if (c.mesh.userData.type === 'dashed') {
-                    c.mesh.material.map.offset.x -= (c.mesh.userData.speed || 0.015);
+                    c.mesh.material.map.offset.x = (c.mesh.material.map.offset.x - scrollSpeed) % 1;
                 } else if (!c.mesh.userData.type || c.mesh.userData.type === 'flow') {
-                    c.mesh.material.map.offset.x -= (c.mesh.userData.speed || 0.04);
+                    c.mesh.material.map.offset.x = (c.mesh.material.map.offset.x - scrollSpeed) % 1;
                 }
             }
         });
@@ -554,7 +562,7 @@ export class TopologySceneEngine {
                 mesh.name = `CONN_${connID}`;
                 mesh.userData = { 
                     isConnection: true, id: connID, texture: texture, 
-                    speed: style.speed, currentWidth: width, type: style.type,
+                    speed: style.speed, scrollSpeed: resolveConnectionScrollSpeed(style.speed, style.type), currentWidth: width, type: style.type,
                     baseOpacity: style.opacity, renderType: this.config.USE_RIBBON_CONNECTIONS ? 'ribbon' : 'tube'
                 };
 

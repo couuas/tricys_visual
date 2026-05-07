@@ -2,13 +2,13 @@
   <NotificationSystem /> <router-view></router-view>
 </template>
 <script setup>
-import NotificationSystem from './components/common/NotificationSystem.vue';
+import NotificationSystem from './shared/ui/components/NotificationSystem.vue';
 import { watch } from 'vue';
-import { useAuth } from './composables/useAuth';
-import { useSimulation } from './composables/useSimulation';
+import { useAuth } from './shared/auth/composables/useAuth';
+import { useWorkspaceSession } from './shared/session/composables/useWorkspaceSession';
 
 const { currentUser } = useAuth();
-const { resetSession } = useSimulation();
+const { resetSession } = useWorkspaceSession();
 
 // Clear simulation session on logout
 watch(currentUser, (newVal) => {

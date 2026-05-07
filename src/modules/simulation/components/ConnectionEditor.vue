@@ -1,0 +1,321 @@
+<template>
+  <div class="editor-panel connection-editor" :class="{ open: selectedConnectionId, 'embedded-mode': embedded }" @click.stop>
+    <div class="header">
+      <h3>{{ selectedConnectionId ? formattedName : 'Connection Setting' }}</h3>
+      <button
+        v-if="!embedded || allowClose"
+        class="close-btn"
+        @click="handleClose"
+        title="Hide Panel"
+      >×</button>
+    </div>
+
+    <div v-if="selectedConnectionId" class="content custom-scroll">
+      <div class="section-header-group">
+        <div class="section-label">APPEARANCE</div>
+        <span class="unlocked-badge">✎ Editable</span>
+      </div>
+
+      <div class="form-group">
+        <label>Color</label>
+        <div class="color-picker-wrapper">
+          <input type="color" v-model="localStyle.color" class="color-input">
+          <input type="text" v-model="localStyle.color" class="hex-input">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Line Width: {{ localStyle.width?.toFixed(1) }}</label>
+        <input type="range" min="1.0" max="20.0" step="0.5" v-model.number="localStyle.width">
+      </div>
+
+      <div class="form-group">
+        <label>Opacity: {{ localStyle.opacity }}</label>
+        <input type="range" min="0.1" max="1.0" step="0.1" v-model.number="localStyle.opacity">
+      </div>
+
+      <div class="form-group" v-if="localStyle.type !== 'solid'">
+        <label>Flow Speed: {{ localStyle.speed }}x</label>
+        <input type="range" min="0.1" max="5.0" step="0.1" v-model.number="localStyle.speed">
+      </div>
+
+      <div style="height: 20px;"></div>
+    </div>
+
+    <div v-else class="empty-state">
+      <div class="icon">🔗</div>
+      <div>Select a connection line to edit.</div>
+    </div>
+
+    <div class="actions" v-if="selectedConnectionId">
+      <button class="btn primary" @click="save">Apply</button>
+      <button class="btn secondary" @click="syncAll" title="Apply to ALL lines">Sync All</button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, watch, computed } from 'vue';
+import { useSimulationSceneStore } from '../stores/simulationScene.store';
+import { useProjectWorkspace } from '../../../shared/project/composables/useProjectWorkspace';
+import { $confirm } from '../../../utils/dialog';
+
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+  allowClose: { type: Boolean, default: false },
+});
+const emit = defineEmits(['close', 'close-panel']);
+
+const { currentProjectId, modelConfig, structureData } = useProjectWorkspace();
+const { selectedConnectionId, getConnectionStyle, updateConnectionStyle, syncAllConnections, defaultConnectionStyle } = useSimulationSceneStore({ currentProjectId, modelConfig, structureData });
+const localStyle = ref({ ...defaultConnectionStyle });
+
+const formattedName = computed(() => {
+  const id = selectedConnectionId.value;
+  if (!id) return '';
+  if (structureData.value?.connections) {
+    const conn = structureData.value.connections.find((item) => `${item.from.toLowerCase()}_${item.to.toLowerCase()}` === id);
+    if (conn) return `Line: ${conn.from} → ${conn.to}`;
+  }
+  return `Line: ${id}`;
+});
+
+watch(selectedConnectionId, (newId) => {
+  if (!newId) return;
+  localStyle.value = { ...getConnectionStyle(newId) };
+  if (localStyle.value.width === undefined) localStyle.value.width = 4.0;
+});
+
+const handleClose = () => {
+  if (props.embedded && props.allowClose) emit('close-panel');
+  else emit('close');
+};
+
+const save = async () => {
+  if (selectedConnectionId.value) await updateConnectionStyle(selectedConnectionId.value, localStyle.value);
+};
+
+const syncAll = async () => {
+  const isConfirmed = await $confirm('This will overwrite the visual style of ALL connection lines in the system. Proceed?', 'SYNC STYLES');
+  if (!isConfirmed) return;
+  await syncAllConnections(localStyle.value);
+  await save();
+};
+</script>
+
+<style scoped>
+.editor-panel {
+  position: absolute;
+  top: 100px;
+  right: -400px;
+  width: 320px;
+  background: rgba(16, 20, 28, 0.95);
+  backdrop-filter: blur(15px);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 210, 255, 0.25);
+  padding: 0;
+  transition: right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 200;
+  box-shadow: -5px 0 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 140px);
+  overflow: hidden;
+}
+
+.editor-panel.open {
+  right: 20px;
+}
+
+.editor-panel.embedded-mode {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  transform: none !important;
+  box-shadow: none;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  z-index: 1;
+  transition: none;
+  box-sizing: border-box;
+}
+
+.editor-panel::-webkit-scrollbar,
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.editor-panel::-webkit-scrollbar-thumb,
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 2px;
+}
+
+.header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #30363d;
+  padding: 15px 20px;
+  background: rgba(16, 20, 28, 0.98);
+}
+
+.editor-panel.embedded-mode .header {
+  background: rgba(20, 25, 35, 0.5);
+}
+
+h3 {
+  margin: 0;
+  color: #00d2ff;
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 5px;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  padding: 15px 20px;
+  border-top: 1px solid #30363d;
+  background: rgba(16, 20, 28, 0.98);
+  margin-top: 0;
+}
+
+.editor-panel.embedded-mode .actions {
+  background: rgba(20, 25, 35, 0.5);
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  text-align: center;
+  padding: 20px;
+}
+
+.empty-state .icon {
+  font-size: 40px;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.section-header-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0 10px 0;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #666;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+.unlocked-badge {
+  font-size: 10px;
+  color: #00d2ff;
+  background: rgba(0, 210, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 5px;
+}
+
+.color-picker-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.color-input {
+  width: 40px;
+  height: 30px;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.hex-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #444;
+  color: #fff;
+  padding: 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  outline: none;
+}
+
+.hex-input:focus {
+  border-color: #00d2ff;
+}
+
+input[type='range'] {
+  width: 100%;
+  cursor: pointer;
+  accent-color: #00d2ff;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+  font-size: 13px;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #0066ff, #00d2ff);
+  color: #fff;
+}
+
+.btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+}
+</style>

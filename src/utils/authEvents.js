@@ -1,4 +1,4 @@
-import { clearAuth } from '../composables/authState';
+import { clearAuth } from '../shared/auth/composables/authState';
 
 let authExpiredInProgress = false;
 
