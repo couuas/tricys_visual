@@ -442,6 +442,7 @@ const handleLibraryAssetSelect = (url) => {
   if (isReadOnly.value || !canApplyLibraryAsset.value) return;
   localConfig.value = {
     ...localConfig.value,
+    type: url ? 'custom' : undefined,
     url
   };
 };

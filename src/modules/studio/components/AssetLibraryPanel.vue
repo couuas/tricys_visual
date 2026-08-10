@@ -1,36 +1,6 @@
 <template>
     <div class="asset-library-panel">
-        <div class="panel-title">Asset Library</div>
-
-        <div class="asset-library-toolbar">
-            <input
-                v-model="searchTerm"
-                type="text"
-                class="library-search"
-                placeholder="Search assets"
-            />
-            <button class="upload-btn" :disabled="isReadOnly" @click="$emit('requestUpload')">Upload</button>
-        </div>
-
-        <div class="asset-filter-row">
-            <button
-                v-for="filter in categoryFilters"
-                :key="filter.value"
-                class="filter-chip"
-                :class="{ active: activeCategory === filter.value }"
-                @click="activeCategory = filter.value"
-            >
-                <span>{{ filter.label }}</span>
-                <span class="filter-count">{{ filter.count }}</span>
-            </button>
-        </div>
-
-        <div class="asset-library-status">
-            <span v-if="selectedComponentLabel">Target: {{ selectedComponentLabel }}</span>
-            <span v-else-if="selectedConnectionId">Target: Connection {{ selectedConnectionId }}</span>
-            <span v-else>Select a component to apply</span>
-            <span v-if="selectedComponentCategory" class="status-chip">{{ selectedComponentCategory }}</span>
-        </div>
+        <div class="panel-title">Properties</div>
 
         <div v-if="selectedConnectionId || selectedComponentLabel" class="selection-merge-panel">
             <div class="selection-merge-header">
@@ -80,19 +50,23 @@
                     <div class="selection-binding-url">{{ bindingState.currentAsset?.url || 'Using built-in primitive' }}</div>
                 </div>
 
-                <div v-if="bindingState.recommendations?.length" class="selection-quick-recommendations">
-                    <div class="selection-binding-title">Quick Recommendations</div>
-                    <div class="selection-chip-list">
-                        <button
-                            v-for="asset in bindingState.recommendations.slice(0, 3)"
-                            :key="`quick-${asset.id}`"
-                            class="selection-chip"
-                            :disabled="isReadOnly || !canApplyAsset"
-                            @click="$emit('selectAsset', asset.url)"
+                <div class="selection-model-dropdown">
+                    <div class="selection-binding-title">Select 3D Model</div>
+                    <select
+                        class="selection-select-input"
+                        :disabled="isReadOnly || !canApplyAsset"
+                        :value="selectedAssetUrl"
+                        @change="$emit('selectAsset', $event.target.value)"
+                    >
+                        <option value="">-- Default Primitive --</option>
+                        <option
+                            v-for="asset in models"
+                            :key="asset.id"
+                            :value="asset.url"
                         >
                             {{ asset.name }}
-                        </button>
-                    </div>
+                        </option>
+                    </select>
                 </div>
             </template>
 
@@ -100,120 +74,26 @@
                 <button v-if="selectedConnectionId" class="selection-btn primary" :disabled="isReadOnly" @click="emit('saveConnection')">Apply</button>
                 <button v-if="selectedConnectionId" class="selection-btn secondary" :disabled="isReadOnly" @click="emit('syncAllConnections')">Sync All</button>
                 <button v-if="!selectedConnectionId" class="selection-btn primary" :disabled="isReadOnly" @click="emit('saveSelection')">Apply</button>
-                <button v-if="!selectedConnectionId" class="selection-btn secondary" :disabled="isReadOnly" @click="emit('resetSelection')">Reset</button>
-                <button v-if="!selectedConnectionId" class="selection-btn tertiary" :disabled="isReadOnly" @click="emit('requestUpload')">Upload</button>
+                <button v-if="!selectedConnectionId" class="selection-btn secondary" :disabled="isReadOnly" @click="emit('selectAsset', ''); emit('saveSelection')">Reset</button>
+                <button v-if="!selectedConnectionId" class="selection-btn tertiary" :disabled="isReadOnly" @click="emit('requestUpload')">Upload 3D</button>
             </div>
         </div>
 
-        <div class="asset-preview" v-if="previewAsset">
-            <div class="asset-preview-hero" :style="previewHeroStyle">
-                <div class="asset-preview-mark">{{ previewAsset.preview?.label || '3D' }}</div>
-                <div class="asset-preview-copy">
-                    <div class="asset-preview-title">{{ previewAsset.preview?.title || previewAsset.name }}</div>
-                    <div class="asset-preview-subtitle">{{ previewAsset.preview?.subtitle }}</div>
-                </div>
-                <span class="asset-validation-pill" :class="previewAsset.validation?.status">
-                    {{ validationLabel(previewAsset.validation?.status) }}
-                </span>
-            </div>
-
-            <div class="asset-preview-grid">
-                <div class="preview-field">
-                    <span class="preview-label">Format</span>
-                    <span class="preview-value">{{ previewAsset.formatLabel }}</span>
-                </div>
-                <div class="preview-field">
-                    <span class="preview-label">Source</span>
-                    <span class="preview-value">{{ previewAsset.sourceType }}</span>
-                </div>
-                <div class="preview-field">
-                    <span class="preview-label">Category</span>
-                    <span class="preview-value">{{ previewAsset.category }}</span>
-                </div>
-                <div class="preview-field">
-                    <span class="preview-label">Size</span>
-                    <span class="preview-value">{{ previewAsset.sizeLabel || 'Unknown' }}</span>
-                </div>
-            </div>
-
-            <div class="asset-preview-url">{{ previewAsset.url || 'No asset URL' }}</div>
-
-            <div v-if="previewMessages.length" class="preview-messages">
-                <div
-                    v-for="message in previewMessages"
-                    :key="message.text"
-                    class="preview-message"
-                    :class="message.type"
-                >
-                    {{ message.text }}
-                </div>
-            </div>
-
-            <div v-if="previewAsset.tags?.length" class="preview-tags">
-                <span v-for="tag in previewAsset.tags" :key="tag" class="preview-tag">{{ tag }}</span>
+        <div class="asset-preview" v-if="!selectedConnectionId && previewAsset">
+            <div class="asset-preview-title">{{ previewAsset.preview?.title || previewAsset.name || 'Component Preview' }}</div>
+            <div class="asset-preview-viewer">
+                <Mini3DViewer v-if="previewAsset.url" :modelUrl="previewAsset.url" />
+                <div v-else class="empty-viewer">Using Default Geometry</div>
             </div>
         </div>
 
-        <div class="asset-list">
-            <button
-                class="asset-card"
-                :class="{ active: selectedAssetUrl === '' }"
-                :disabled="isReadOnly || !canApplyAsset"
-                @click="$emit('selectAsset', '')"
-            >
-                <span class="asset-name">Default Geometry</span>
-                <span class="asset-meta">Built-in primitive</span>
-            </button>
 
-            <div v-if="filteredRecommendedModels.length > 0" class="asset-section-label">Recommended</div>
-
-            <button
-                v-for="asset in filteredRecommendedModels"
-                :key="`recommended-${asset.id}`"
-                class="asset-card recommended"
-                :class="{ active: selectedAssetUrl === asset.url }"
-                :disabled="isReadOnly || !canApplyAsset"
-                @click="$emit('selectAsset', asset.url)"
-            >
-                <div class="asset-card-topline">
-                    <span class="asset-name">{{ asset.name || asset.url }}</span>
-                    <div class="asset-card-badges">
-                        <span class="asset-badge">{{ asset.category }}</span>
-                        <span class="asset-status-badge" :class="asset.validation?.status">{{ validationLabel(asset.validation?.status) }}</span>
-                    </div>
-                </div>
-                <span class="asset-meta">{{ asset.url }}</span>
-                <span class="asset-submeta">{{ asset.formatLabel }} · {{ asset.sourceType }}<template v-if="asset.sizeLabel"> · {{ asset.sizeLabel }}</template></span>
-            </button>
-
-            <div v-if="filteredModels.length > 0" class="asset-section-label">All Assets</div>
-
-            <button
-                v-for="asset in filteredModels"
-                :key="asset.id"
-                class="asset-card"
-                :class="{ active: selectedAssetUrl === asset.url }"
-                :disabled="isReadOnly || !canApplyAsset"
-                @click="$emit('selectAsset', asset.url)"
-            >
-                <div class="asset-card-topline">
-                    <span class="asset-name">{{ asset.name || asset.url }}</span>
-                    <div class="asset-card-badges">
-                        <span class="asset-badge muted">{{ asset.category }}</span>
-                        <span class="asset-status-badge" :class="asset.validation?.status">{{ validationLabel(asset.validation?.status) }}</span>
-                    </div>
-                </div>
-                <span class="asset-meta">{{ asset.url }}</span>
-                <span class="asset-submeta">{{ asset.formatLabel }} · {{ asset.sourceType }}<template v-if="asset.sizeLabel"> · {{ asset.sizeLabel }}</template></span>
-            </button>
-        </div>
-
-        <div v-if="filteredRecommendedModels.length === 0 && filteredModels.length === 0" class="empty-state">No matching assets</div>
     </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue';
+import Mini3DViewer from '../../simulation/components/Mini3DViewer.vue';
 
 const emit = defineEmits([
     'selectAsset',
@@ -253,67 +133,10 @@ const props = defineProps({
     connectionStyle: { type: Object, default: () => ({}) }
 });
 
-const searchTerm = ref('');
-const activeCategory = ref('all');
 const normalizedScale = computed(() => Number(props.config?.scale ?? 1));
 const normalizedConnectionWidth = computed(() => Number(props.connectionStyle?.width ?? 4));
 const normalizedConnectionOpacity = computed(() => Number(props.connectionStyle?.opacity ?? 0.9));
 const normalizedConnectionSpeed = computed(() => Number(props.connectionStyle?.speed ?? 1));
-
-const normalizedSearch = computed(() => searchTerm.value.trim().toLowerCase());
-
-const matchesSearch = (model) => {
-    if (!normalizedSearch.value) {
-        return true;
-    }
-    const haystacks = [
-        String(model?.name || ''),
-        String(model?.url || ''),
-        String(model?.category || ''),
-        ...(Array.isArray(model?.tags) ? model.tags : [])
-    ].map(value => value.toLowerCase());
-    return haystacks.some(value => value.includes(normalizedSearch.value));
-};
-
-const matchesCategory = (model) => {
-    if (activeCategory.value === 'all') return true;
-    if (activeCategory.value === 'recommended') return props.recommendedModels.some(item => item.id === model.id);
-    if (activeCategory.value === 'valid') return model.validation?.status === 'valid';
-    if (activeCategory.value === 'attention') return model.validation?.status !== 'valid';
-    return model.category === activeCategory.value;
-};
-
-const matchesFilters = (model) => matchesSearch(model) && matchesCategory(model);
-
-const allModels = computed(() => props.models || []);
-const allCategories = computed(() => Array.from(new Set(allModels.value.map(model => model.category).filter(Boolean))));
-
-const categoryFilters = computed(() => {
-    const recommendedIds = new Set((props.recommendedModels || []).map(model => model.id));
-    const filters = [
-        { value: 'all', label: 'All', count: allModels.value.length },
-        { value: 'recommended', label: 'Recommended', count: allModels.value.filter(model => recommendedIds.has(model.id)).length },
-        { value: 'valid', label: 'Ready', count: allModels.value.filter(model => model.validation?.status === 'valid').length },
-        { value: 'attention', label: 'Needs Check', count: allModels.value.filter(model => model.validation?.status !== 'valid').length }
-    ];
-
-    allCategories.value.forEach((category) => {
-        filters.push({
-            value: category,
-            label: category,
-            count: allModels.value.filter(model => model.category === category).length
-        });
-    });
-
-    return filters.filter((filter, index, array) => array.findIndex(item => item.value === filter.value) === index && filter.count > 0);
-});
-
-const filteredRecommendedModels = computed(() => props.recommendedModels.filter(matchesFilters));
-
-const filteredModels = computed(() => {
-    const recommendedIds = new Set(filteredRecommendedModels.value.map(model => model.id));
-    return props.models.filter(model => !recommendedIds.has(model.id) && matchesFilters(model));
-});
 
 const previewAsset = computed(() => {
     if (props.selectedAssetUrl === '') {
@@ -335,10 +158,8 @@ const previewAsset = computed(() => {
         };
     }
 
-    return allModels.value.find(model => model.url === props.selectedAssetUrl)
-        || filteredRecommendedModels.value[0]
-        || filteredModels.value[0]
-        || allModels.value[0]
+    return props.models.find(model => model.url === props.selectedAssetUrl)
+        || props.models[0]
         || null;
 });
 
@@ -393,7 +214,7 @@ const updateNumericConnectionStyle = (key, value) => {
 }
 
 .panel-title {
-    padding: 12px 15px;
+    padding: 12px 15px 12px 42px;
     font-size: 12px;
     font-weight: bold;
     color: #8da2bb;
@@ -597,29 +418,24 @@ const updateNumericConnectionStyle = (key, value) => {
     word-break: break-all;
 }
 
-.selection-quick-recommendations {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+.selection-model-dropdown {
+    margin-top: 10px;
 }
 
-.selection-chip-list {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.selection-chip {
-    border: 1px solid rgba(0, 210, 255, 0.24);
-    background: rgba(0, 210, 255, 0.08);
-    color: #8ae9ff;
-    border-radius: 999px;
-    padding: 6px 10px;
-    font-size: 10px;
+.selection-select-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #dce7f0;
+    border-radius: 6px;
+    font-size: 12px;
+    outline: none;
+    margin-top: 8px;
     cursor: pointer;
 }
 
-.selection-chip:disabled {
+.selection-select-input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -669,11 +485,32 @@ const updateNumericConnectionStyle = (key, value) => {
 }
 
 .asset-preview {
-    padding: 12px;
-    border-bottom: 1px solid #1f2a36;
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    gap: 12px;
+}
+
+.asset-preview-viewer {
+    width: 100%;
+    flex: 1;
+    min-height: 240px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-viewer {
+    color: #6d8299;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .asset-preview-hero {

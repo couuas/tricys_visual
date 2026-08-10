@@ -639,6 +639,11 @@ async function confirmSubmit() {
     return;
   }
 
+  if (!route.query.projectId) {
+    $notify({ title: 'PROJECT REQUIRED', message: 'Project ID is missing. Please open this panel from a valid project workspace.', type: 'error' });
+    return;
+  }
+
   isSubmitting.value = true;
   isRedirecting.value = false;
   try {
@@ -666,7 +671,7 @@ async function confirmSubmit() {
     isSubmitting.value = false;
     isRedirecting.value = false;
   } catch (error) {
-    let message = error.response?.data?.detail || error.message;
+    let message = error.response?.data?.message || error.response?.data?.detail || error.message;
     if (error.response?.status === 401 || error.response?.status === 403) {
       message = 'Session expired or invalid. Please log in again.';
     }

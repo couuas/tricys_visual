@@ -4,10 +4,16 @@ import { useProjectWorkspace } from '../../../shared/project/composables/useProj
 export function useAnalysisWorkspace() {
   const { loadProjectWorkspace, componentParams, structureData, currentProject } = useProjectWorkspace();
 
-  const modelMetadata = computed(() => ({
-    packagePath: currentProject.value?.package_path || '',
-    modelName: currentProject.value?.model_name || currentProject.value?.name || 'example_model.Cycle',
-  }));
+  const modelMetadata = computed(() => {
+    let modelName = currentProject.value?.simulation_config?.model_name;
+    if (!modelName || modelName === 'Model') {
+      modelName = 'example_model.Cycle';
+    }
+    return {
+      packagePath: currentProject.value?.package_path || '',
+      modelName,
+    };
+  });
 
   return {
     loadData: loadProjectWorkspace,

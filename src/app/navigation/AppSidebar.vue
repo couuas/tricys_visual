@@ -132,7 +132,7 @@ const navGroups = [
     items: [
       { name: 'model-editor', label: 'Studio', shortLabel: 'STD', icon: '🛠', activeNames: ['model-editor'] },
       { name: 'config', label: 'Simulation', shortLabel: 'SIM', icon: '⚙', activeNames: ['config', 'demo'] },
-      { name: 'analysis', label: 'Agent', shortLabel: 'AGT', icon: '🧠', activeNames: ['analysis'] },
+      { name: 'analysis', label: 'Analysis', shortLabel: 'AGT', icon: '🧠', activeNames: ['analysis'] },
       { name: 'monitor', label: 'Monitor', shortLabel: 'MON', icon: '⚡', activeNames: ['monitor'] },
     ],
   },
@@ -141,7 +141,7 @@ const navGroups = [
     label: 'Exhibition',
     icon: '◧',
     items: [
-      { name: 'pages', label: 'Project Pages', shortLabel: 'PGS', icon: '📊', activeNames: ['pages', 'goview'] },
+      { name: 'pages', label: 'Goview Pages', shortLabel: 'PGS', icon: '📊', activeNames: ['pages', 'goview'] },
     ],
   },
 ];

@@ -452,8 +452,8 @@ onUnmounted(() => {
 
 <style scoped>
 .vis-view { position: relative; width: 100%; height: 100%; overflow: hidden; background: #05070a; display: flex; flex-direction: column; font-family: 'Inter', 'Roboto Mono', sans-serif; }
-.editor-entry-overlay { position: absolute; top: 15px; right: 15px; z-index: 50; }
-.scene-action-overlay { position: absolute; top: 15px; left: 15px; z-index: 50; display: flex; align-items: center; gap: 10px; }
+.editor-entry-overlay { position: absolute; top: 15px; left: 15px; z-index: 50; }
+.scene-action-overlay { position: absolute; top: 15px; right: 15px; z-index: 50; display: flex; align-items: center; gap: 10px; }
 .editor-entry-btn { background: linear-gradient(135deg, #00d2ff, #007bff); border: none; padding: 8px 16px; border-radius: 6px; color: #000; font-weight: bold; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3); transition: all 0.2s; }
 .editor-entry-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4); }
 .editor-entry-btn.btn-readonly { background: linear-gradient(135deg, #444, #666); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); }

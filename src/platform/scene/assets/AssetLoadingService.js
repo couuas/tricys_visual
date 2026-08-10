@@ -6,7 +6,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 const TANK_HEIGHT = 36;
 const MAX_CONCURRENT_CUSTOM_LOADS = 2;
-const LOAD_TIMEOUT_MS = 20000;
+const LOAD_TIMEOUT_MS = 60000;
 
 export class AssetLoadingService {
     constructor(renderer) {
@@ -32,7 +32,7 @@ export class AssetLoadingService {
     initLoaders() {
         if (!this.gltfLoader && this.renderer) {
             this.dracoLoader = new DRACOLoader();
-            this.dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+            this.dracoLoader.setDecoderPath('https://unpkg.com/three@0.181.2/examples/jsm/libs/draco/gltf/');
             this.ktx2Loader = new KTX2Loader();
             this.ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.181.2/examples/jsm/libs/basis/');
             this.ktx2Loader.detectSupport(this.renderer);

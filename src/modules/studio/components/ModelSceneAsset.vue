@@ -144,25 +144,30 @@ defineExpose({
 
 .asset-overlay {
   position: absolute;
-  inset: 0;
+  bottom: 20px;
+  right: 20px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  background: rgba(11, 16, 22, 0.88);
+  background: rgba(11, 16, 22, 0.95);
   color: #8fb7dc;
-  z-index: 5;
+  z-index: 50;
+  padding: 16px 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(143, 183, 220, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
 }
 
 .asset-overlay-title {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
 }
 
 .asset-overlay-subtitle {
-  margin-top: 10px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 11px;
   color: #6f8498;
 }
 </style>

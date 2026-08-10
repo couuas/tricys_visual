@@ -107,7 +107,7 @@
               <td>
                 <div class="cell-group">
                     <div class="task-name" :title="task.name">{{ task.name }}</div>
-                    <div class="task-id">{{ task.id.slice(0,8) }}</div>
+                    <div class="task-id" :title="task.id">{{ task.id }}</div>
                 </div>
               </td>
               
@@ -674,7 +674,7 @@ watch(() => props.tasks, calculateStats, { deep: true });
 /* Cell Groups */
 .cell-group { display: flex; flex-direction: column; gap: 3px; }
 .task-name { font-weight: 600; color: #fff; font-size: 12px; }
-.task-id { font-family: 'Consolas', monospace; color: #666; font-size: 10px; }
+.task-id { font-family: 'Consolas', monospace; font-size: 10px; color: #8b949e; margin-top: 2px; }
 
 .status-badge {
     padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase;

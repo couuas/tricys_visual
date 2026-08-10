@@ -67,7 +67,14 @@ import ResultFileBrowser from './ResultFileBrowser.vue';
 import { TaskFocPreview } from '../../simulation/public';
 import { $notify, $updateNotification, closeNotification } from '../../../utils/notification';
 import { marked } from 'marked';
+import markedKatex from 'marked-katex-extension';
+import 'katex/dist/katex.min.css';
 import apiClient from '../../../api/client';
+
+marked.use(markedKatex({ 
+  throwOnError: false,
+  nonStandard: true 
+}));
 import { getTaskFocConfig } from '../../../utils/taskFoc';
 
 const props = defineProps({
@@ -121,6 +128,13 @@ const resolveMarkdownImagePath = (src) => {
 
 const renderedMarkdown = computed(() => {
   if (!fileContent.value || !isMarkdownFile(selectedFile.value?.name)) return '';
+
+  let processedContent = fileContent.value
+    .replace(/\\\[/g, '$$$$')
+    .replace(/\\\]/g, '$$$$')
+    .replace(/\\\(/g, '$$')
+    .replace(/\\\)/g, '$$');
+
   const renderer = new marked.Renderer();
   renderer.image = (href, title, text) => {
     // ... existing renderer logic
@@ -132,7 +146,7 @@ const renderedMarkdown = computed(() => {
     const alt = text || '';
     return `<img data-md-src="${raw}" alt="${alt}"${safeTitle} class="markdown-img" loading="lazy" />`;
   };
-  return marked.parse(fileContent.value, { renderer });
+  return marked.parse(processedContent, { renderer });
 });
 
 const svgDataUrl = computed(() => {
@@ -285,13 +299,123 @@ watch(renderedMarkdown, async () => {
 .preview-body pre { margin: 0; white-space: pre-wrap; color: #c9d1d9; font-family: 'Consolas', monospace; font-size: 12px; }
 .svg-preview { max-width: 100%; height: auto; display: block; }
 
-.markdown-body { color: #c9d1d9; font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5; }
-/* Markdown styles matching VisualizerView */
-:deep(.markdown-body h1), :deep(.markdown-body h2), :deep(.markdown-body h3) { color: #fff; margin-top: 1em; margin-bottom: 0.5em; }
-:deep(.markdown-body a) { color: #00d2ff; }
-:deep(.markdown-body code) { background: #0b0e14; padding: 2px 4px; border-radius: 3px; font-family: 'Consolas', monospace; }
-:deep(.markdown-body pre) { background: #0b0e14; padding: 10px; overflow: auto; border-radius: 4px; border: 1px solid #30363d; }
-:deep(.markdown-img) { max-width: 100%; height: auto; display: block; margin: 6px 0; border: 1px solid #30363d; }
+.markdown-body { 
+  color: #c9d1d9; 
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+  font-size: 14px; 
+  line-height: 1.6; 
+  padding: 10px 20px;
+}
+
+/* Premium Markdown Styles matching modern dark mode aesthetics */
+:deep(.markdown-body h1), 
+:deep(.markdown-body h2), 
+:deep(.markdown-body h3),
+:deep(.markdown-body h4),
+:deep(.markdown-body h5),
+:deep(.markdown-body h6) { 
+  color: #e6edf3; 
+  margin-top: 24px; 
+  margin-bottom: 16px; 
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+:deep(.markdown-body h1) { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid #21262d; }
+:deep(.markdown-body h2) { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid #21262d; }
+:deep(.markdown-body h3) { font-size: 1.25em; }
+
+:deep(.markdown-body p) { margin-top: 0; margin-bottom: 16px; }
+
+:deep(.markdown-body a) { color: #4493f8; text-decoration: none; }
+:deep(.markdown-body a:hover) { text-decoration: underline; }
+
+:deep(.markdown-body code) { 
+  background: rgba(110,118,129,0.4); 
+  padding: 0.2em 0.4em; 
+  border-radius: 6px; 
+  font-family: 'Consolas', 'Courier New', monospace; 
+  font-size: 85%;
+}
+
+:deep(.markdown-body pre) { 
+  background: #161b22; 
+  padding: 16px; 
+  overflow: auto; 
+  border-radius: 6px; 
+  border: 1px solid #30363d; 
+  margin-bottom: 16px;
+}
+
+:deep(.markdown-body pre code) {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 100%;
+}
+
+:deep(.markdown-body blockquote) {
+  padding: 0 1em;
+  color: #8b949e;
+  border-left: 0.25em solid #30363d;
+  margin: 0 0 16px 0;
+}
+
+:deep(.markdown-body ul), :deep(.markdown-body ol) {
+  padding-left: 2em;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+:deep(.markdown-body li) { margin-top: 0.25em; }
+
+:deep(.markdown-body table) {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  display: block;
+}
+
+:deep(.markdown-body table th),
+:deep(.markdown-body table td) {
+  padding: 8px 13px;
+  border: 1px solid #30363d;
+}
+
+:deep(.markdown-body table th) {
+  font-weight: 600;
+  background-color: #161b22;
+}
+
+:deep(.markdown-body table tr) {
+  background-color: #0d1117;
+  border-top: 1px solid #21262d;
+}
+
+:deep(.markdown-body table tr:nth-child(2n)) {
+  background-color: #161b22;
+}
+
+:deep(.markdown-body hr) {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: #30363d;
+  border: 0;
+}
+
+:deep(.markdown-img) { 
+  max-width: 100%; 
+  height: auto; 
+  display: block; 
+  margin: 20px auto; 
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  border: 1px solid #30363d; 
+}
 
 .hint { margin-top: 6px; font-size: 11px; color: #8b949e; }
 .empty { color: #555; font-style: italic; padding: 20px; text-align: center; }

@@ -7,7 +7,13 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { resolveBackendBase } from '../../../utils/runtimeUrls';
+
+let dracoLoader = null;
+let ktx2Loader = null;
 
 const props = defineProps(['modelUrl']);
 const container = ref(null);
@@ -83,7 +89,20 @@ const loadModel = () => {
     if (oldModel) deepDispose(oldModel);
   }
 
+  if (!dracoLoader) {
+    dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://unpkg.com/three@0.181.2/examples/jsm/libs/draco/gltf/');
+  }
+  if (!ktx2Loader && renderer) {
+    ktx2Loader = new KTX2Loader();
+    ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.181.2/examples/jsm/libs/basis/');
+    ktx2Loader.detectSupport(renderer);
+  }
+
   const loader = new GLTFLoader();
+  loader.setDRACOLoader(dracoLoader);
+  if (ktx2Loader) loader.setKTX2Loader(ktx2Loader);
+  loader.setMeshoptDecoder(MeshoptDecoder);
   let url = props.modelUrl;
   if (!url.startsWith('http')) {
     url = `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;

@@ -493,6 +493,11 @@ async function generateDraft() {
 async function submitAgentDraft() {
   if (!agentDraftPayload.value) return;
 
+  if (!route.query.projectId) {
+    $notify({ title: 'PROJECT REQUIRED', message: 'Project ID is missing. Please open this panel from a valid project workspace.', type: 'error' });
+    return;
+  }
+
   isSubmittingDraft.value = true;
   setAgentStep('submit', 'active');
   try {
@@ -502,7 +507,8 @@ async function submitAgentDraft() {
     setAgentStep('track', 'active');
   } catch (error) {
     setAgentStep('submit', 'failed');
-    $notify({ title: 'AGENT SUBMISSION FAILED', message: error.response?.data?.detail || error.message, type: 'error' });
+    const errorMsg = error.response?.data?.message || error.response?.data?.detail || error.message;
+    $notify({ title: 'AGENT SUBMISSION FAILED', message: errorMsg, type: 'error' });
   } finally {
     isSubmittingDraft.value = false;
   }
