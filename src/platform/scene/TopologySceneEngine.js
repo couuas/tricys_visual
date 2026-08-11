@@ -212,7 +212,8 @@ export class TopologySceneEngine {
             normalized.visual.modelConfig,
             normalized.visual.annotations,
             normalized.visual.componentGroups,
-            normalized.visual.expandedGroupId
+            normalized.visual.expandedGroupId,
+            normalized.visual.visibleIds
         );
         return Promise.resolve();
     }
@@ -249,7 +250,17 @@ export class TopologySceneEngine {
     }
 
     updateConfig(newConfig) {
+        const prevVisibleIds = this.config.visibleIds;
+        const prevMultiSelectedIds = this.config.multiSelectedIds;
+        
         this.config = { ...this.config, ...newConfig };
+        
+        if (newConfig.visibleIds && newConfig.visibleIds !== prevVisibleIds) {
+            this.updateVisibilityVisuals();
+        }
+        if (newConfig.multiSelectedIds && newConfig.multiSelectedIds !== prevMultiSelectedIds) {
+            this.updateSelectionVisuals();
+        }
     }
 
     updateLoop() {
@@ -645,8 +656,8 @@ export class TopologySceneEngine {
 
         // Update connections
         this.connectionRegistry.forEach(c => {
-            const sourceRenderId = this.getRenderParentId(c.sourceId);
-            const targetRenderId = this.getRenderParentId(c.targetId);
+            const sourceRenderId = this.getRenderParentId(c.realFrom);
+            const targetRenderId = this.getRenderParentId(c.realTo);
             
             // Connection is visible only if BOTH source and target are visible
             let sourceVis = visibleIds.has(sourceRenderId);
@@ -665,6 +676,9 @@ export class TopologySceneEngine {
             
             if (c.mesh) {
                 c.mesh.visible = isVis;
+                if (c.mesh.userData && c.mesh.userData.hitMesh) {
+                    c.mesh.userData.hitMesh.visible = isVis;
+                }
                 c.mesh.traverse(child => {
                     if (child.isCSS2DObject) {
                         child.visible = isVis;
@@ -694,7 +708,7 @@ export class TopologySceneEngine {
     }
 
     // Used by UI to force-rebuild logic when properties change (like ThreeScene's `rebuildVisuals()`)
-    rebuildScene(structureData, modelConfig, annotations, componentGroups = {}, expandedGroupId = null) {
+    rebuildScene(structureData, modelConfig, annotations, componentGroups = {}, expandedGroupId = null, visibleIds = null) {
         this.config.componentGroups = componentGroups;
         this.config.expandedGroupId = expandedGroupId;
         this.currentDocument = cloneSceneDocument({
@@ -707,7 +721,8 @@ export class TopologySceneEngine {
                 modelConfig,
                 annotations,
                 componentGroups,
-                expandedGroupId
+                expandedGroupId,
+                visibleIds
             }
         });
         

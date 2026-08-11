@@ -2,7 +2,7 @@ import { computed } from 'vue';
 import { useProjectWorkspace } from '../../../shared/project/composables/useProjectWorkspace';
 
 export function useAnalysisWorkspace() {
-  const { loadProjectWorkspace, componentParams, structureData, currentProject } = useProjectWorkspace();
+  const { loadProjectWorkspace, componentParams, structureData, currentProject, modelConfig } = useProjectWorkspace();
 
   const modelMetadata = computed(() => {
     let modelName = currentProject.value?.simulation_config?.model_name;
@@ -19,6 +19,7 @@ export function useAnalysisWorkspace() {
     loadData: loadProjectWorkspace,
     componentParams,
     structureData,
+    modelConfig,
     modelMetadata,
   };
 }

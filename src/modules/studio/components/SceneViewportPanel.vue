@@ -55,6 +55,7 @@ const buildSceneDocument = () => createSceneDocument({
   annotations: props.annotations || {},
   componentGroups: props.componentGroups || {},
   expandedGroupId: props.expandedGroupId,
+  visibleIds: Array.from(props.visibleIds || []),
   viewMode: '3d'
 });
 
@@ -207,7 +208,13 @@ const serializeSceneDocument = (viewMode = '3d') => {
   }
 
   const serialized = engine.value?.serialize?.();
-  return serialized?.topology?.components?.length ? serialized : buildSceneDocument();
+  if (serialized?.topology?.components?.length) {
+    if (serialized.visual) {
+      serialized.visual.visibleIds = Array.from(props.visibleIds || []);
+    }
+    return serialized;
+  }
+  return buildSceneDocument();
 };
 
 const loadSceneDocument = async (document) => {

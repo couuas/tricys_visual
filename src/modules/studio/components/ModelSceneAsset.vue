@@ -16,6 +16,7 @@
       :component-groups="resolvedComponentGroups"
       :expanded-group-id="resolvedExpandedGroupId"
       :multi-selected-ids="resolvedMultiSelectedIds"
+      :visible-ids="resolvedVisibleIds"
       :is-read-only="resolvedIsReadOnly"
       @selectComponent="emit('selectComponent', $event)"
       @selectConnection="emit('selectConnection', $event)"
@@ -47,6 +48,7 @@ const props = defineProps({
   expandedGroupId: { type: String, default: undefined },
   getConnectionStyle: { type: Function, default: undefined },
   multiSelectedIds: { type: Object, default: undefined },
+  visibleIds: { type: Object, default: undefined },
   isReadOnly: { type: Boolean, default: undefined }
 });
 
@@ -96,6 +98,9 @@ const resolvedGetConnectionStyle = computed(() => (
 ));
 const resolvedMultiSelectedIds = computed(() => (
   props.multiSelectedIds || internalState.multiSelectedIds.value
+));
+const resolvedVisibleIds = computed(() => (
+  props.visibleIds || internalState.visibleIds.value
 ));
 const showLoadingState = computed(() => !resolvedStructureData.value?.components);
 

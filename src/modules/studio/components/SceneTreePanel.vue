@@ -18,7 +18,15 @@
                                 <path d="M12 3v8m0 10v-10m7-4-7 4-7-4" />
                             </svg>
                         </span>
-                        <span class="tree-node-label">TRICYS MODEL</span>
+                        <span class="tree-node-label" style="flex: 1;">TRICYS MODEL</span>
+                        <div class="tree-header-actions" style="display: flex; gap: 4px; margin-right: 8px;">
+                            <button class="tree-action-btn" @click.stop="$emit('show-all')" title="Show All" style="background: none; border: none; color: inherit; cursor: pointer; opacity: 0.6; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                            <button class="tree-action-btn" @click.stop="$emit('hide-all')" title="Hide All" style="background: none; border: none; color: inherit; cursor: pointer; opacity: 0.6; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                            </button>
+                        </div>
                         <span class="tree-node-meta">{{ rootNodeCount }} nodes</span>
                     </div>
                 </div>
@@ -127,7 +135,7 @@
 import { computed } from 'vue';
 import { normalizeComponentId, normalizeSelectionId, resolveGroupKey } from '../../../utils/groupIds';
 
-defineEmits(['selectItem', 'focusItem', 'toggleGroup', 'toggleVisibility', 'toggleGroupVisibility']);
+defineEmits(['selectItem', 'focusItem', 'toggleGroup', 'toggleVisibility', 'toggleGroupVisibility', 'show-all', 'hide-all']);
 
 const props = defineProps({
     components: { type: [Array, Object], default: () => [] },

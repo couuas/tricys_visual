@@ -88,6 +88,7 @@ export function useWorkbenchStore({ projectId, structureData, modelConfig, annot
                 annotations: annotations.value,
                 componentGroups: componentGroups.value,
                 expandedGroupId: expandedGroupId.value,
+                visibleIds: Array.from(visibleIds.value),
                 viewMode: historyViewMode.value
             });
 
@@ -141,11 +142,17 @@ export function useWorkbenchStore({ projectId, structureData, modelConfig, annot
             
             if (visibleIds.value.size === 0) {
                  const newVisible = new Set();
-                 components.forEach(c => {
-                     if (c.has_layout) {
-                         newVisible.add(getSafeId(c.id));
+                 if (modelConfig.value && modelConfig.value.visibleIds !== undefined) {
+                     if (Array.isArray(modelConfig.value.visibleIds)) {
+                         modelConfig.value.visibleIds.forEach(id => newVisible.add(getSafeId(id)));
                      }
-                 });
+                 } else {
+                     components.forEach(c => {
+                         if (c.has_layout) {
+                             newVisible.add(getSafeId(c.id));
+                         }
+                     });
+                 }
                  visibleIds.value = newVisible;
             }
         },

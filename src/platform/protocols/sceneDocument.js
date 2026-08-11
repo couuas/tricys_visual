@@ -9,6 +9,7 @@ export const createSceneDocument = ({
     annotations = {},
     componentGroups = {},
     expandedGroupId = null,
+    visibleIds = null,
     viewMode = '3d'
 } = {}) => ({
     version: '1.0.0',
@@ -21,7 +22,8 @@ export const createSceneDocument = ({
         modelConfig: cloneValue(modelConfig || {}),
         annotations: cloneValue(annotations || {}),
         componentGroups: cloneValue(componentGroups || {}),
-        expandedGroupId: expandedGroupId || null
+        expandedGroupId: expandedGroupId || null,
+        visibleIds: visibleIds ? cloneValue(visibleIds) : null
     }
 });
 
@@ -36,7 +38,8 @@ export const normalizeSceneDocument = (document = {}) => ({
         modelConfig: document?.visual?.modelConfig || {},
         annotations: document?.visual?.annotations || {},
         componentGroups: document?.visual?.componentGroups || {},
-        expandedGroupId: document?.visual?.expandedGroupId || null
+        expandedGroupId: document?.visual?.expandedGroupId || null,
+        visibleIds: document?.visual?.visibleIds || null
     }
 });
 
@@ -47,5 +50,6 @@ export const cloneSceneDocument = (document = {}) => createSceneDocument({
     annotations: document?.visual?.annotations,
     componentGroups: document?.visual?.componentGroups,
     expandedGroupId: document?.visual?.expandedGroupId,
+    visibleIds: document?.visual?.visibleIds,
     viewMode: document?.metadata?.viewMode
 });

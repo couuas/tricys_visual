@@ -4,7 +4,7 @@
             <div v-if="!isReadOnly || showControls" class="topology-header">
                 <div v-if="!isReadOnly">
                     <div class="topology-title">2D Twin</div>
-                    <div class="topology-subtitle">Selection, grouping, and layout stay synced with the 3D scene.</div>
+
                 </div>
                 <div v-if="showControls" class="topology-controls">
                     <button class="control-btn" type="button" :class="{ active: routeMode === 'orthogonal' }" @click="emit('update:routeMode', 'orthogonal')">Auto Route</button>
@@ -179,6 +179,10 @@ const props = defineProps({
         type: String,
         default: null
     },
+    visibleIds: {
+        type: [Object, Set],
+        default: () => new Set()
+    },
     annotations: {
         type: Object,
         default: () => ({})
@@ -226,7 +230,16 @@ const suppressClickNodeId = ref(null);
 const suppressClickGroupId = ref(null);
 const normalizedSelectedComponentId = computed(() => normalizeSelectionId(props.selectedComponentId, props.componentGroups || {}));
 
-const rawComponents = computed(() => Array.isArray(props.structureData?.components) ? props.structureData.components : []);
+const rawComponents = computed(() => {
+  const allComps = Array.isArray(props.structureData?.components) ? props.structureData.components : [];
+  if (props.visibleIds) {
+    return allComps.filter(c => {
+        const sid = normalizeSelectionId(c.id || c.name, props.componentGroups || {});
+        return props.visibleIds.has(sid);
+    });
+  }
+  return allComps;
+});
 const rawConnections = computed(() => Array.isArray(props.structureData?.connections) ? props.structureData.connections : []);
 const annotationMap = computed(() => props.annotations || {});
 const multiSelectedIdSet = computed(() => {
@@ -294,9 +307,12 @@ const groupLookup = computed(() => {
 
 const normalizedConnections = computed(() => projectTopologyTwinConnections(rawConnections.value, nodeMap.value));
 const viewportTransform = computed(() => `translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`);
-const structureSignature = computed(() => rawComponents.value
+const structureSignature = computed(() => {
+  const allComps = Array.isArray(props.structureData?.components) ? props.structureData.components : [];
+  return allComps
     .map((component, index) => normalizeComponentId(component.id || component.name || `node-${index}`))
-    .join('|'));
+    .join('|');
+});
 
 const dragBounds = computed(() => {
     const source = layoutNodes.value.length > 0 ? layoutNodes.value : baseLayoutNodes.value;

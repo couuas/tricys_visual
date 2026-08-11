@@ -17,39 +17,78 @@
     </template>
 
     <template #left>
-      <SceneTreePanel
-        :components="structureData.components || []"
-        :component-groups="componentGroups"
-        :selected-id="selectedId"
-        :selected-connection-id="selectedConnectionId"
-        :expanded-group-id="expandedGroupId"
-        :multi-selected-ids="multiSelectedIds"
-        :visible-ids="visibleIds"
-        :is-selected-group="isSelectedGroup"
-        :selected-group-id="selectedGroupId"
-        :is-read-only="isReadOnly"
-        :note="localNote"
-        :config="localConfig"
-        :binding-state="bindingPanelState"
-        :connection-style="localConnectionStyle"
-        @select-item="handleTreeSelect"
-        @focus-item="handleTreeFocus"
-        @toggle-group="handleTreeToggleGroup"
-        @toggle-visibility="handleToggleVisibility"
-        @toggle-group-visibility="handleToggleGroupVisibility"
-        @close-selection="clearComponentSelection"
-        @toggle-group-view="toggleGroupView"
-        @dissolve-group="handleDissolveGroup"
-        @update:note="localNote = $event"
-        @update:config="localConfig = $event"
-        @save-selection="saveComponentChanges"
-        @reset-selection="resetComponentChanges"
-        @request-upload="triggerFileUpload"
-        @close-connection="clearConnectionSelection"
-        @update:connection-style="localConnectionStyle = $event"
-        @save-connection="saveConnectionVisuals"
-        @sync-all-connections="syncAllConnectionVisuals"
-      />
+      <div class="left-sidebar-container">
+        <SceneTreePanel
+          class="scene-tree-section"
+          :components="structureData.components || []"
+          :component-groups="componentGroups"
+          :selected-id="selectedId"
+          :selected-connection-id="selectedConnectionId"
+          :expanded-group-id="expandedGroupId"
+          :multi-selected-ids="multiSelectedIds"
+          :visible-ids="visibleIds"
+          :is-selected-group="isSelectedGroup"
+          :selected-group-id="selectedGroupId"
+          :is-read-only="isReadOnly"
+          :note="localNote"
+          :config="localConfig"
+          :binding-state="bindingPanelState"
+          :connection-style="localConnectionStyle"
+          @select-item="handleTreeSelect"
+          @focus-item="handleTreeFocus"
+          @toggle-group="handleTreeToggleGroup"
+          @toggle-visibility="handleToggleVisibility"
+          @toggle-group-visibility="handleToggleGroupVisibility"
+          @close-selection="clearComponentSelection"
+          @toggle-group-view="toggleGroupView"
+          @dissolve-group="handleDissolveGroup"
+          @show-all="handleShowAll"
+          @hide-all="handleHideAll"
+          @update:note="localNote = $event"
+          @update:config="localConfig = $event"
+          @save-selection="saveComponentChanges"
+          @reset-selection="resetComponentChanges"
+          @request-upload="triggerFileUpload"
+          @close-connection="clearConnectionSelection"
+          @update:connection-style="localConnectionStyle = $event"
+          @save-connection="saveConnectionVisuals"
+          @sync-all-connections="syncAllConnectionVisuals"
+        />
+
+        <div v-if="relatedDiscoveryComponents.length > 0" class="related-discovery-panel">
+          <div class="discovery-header">
+            <span class="discovery-title" style="flex: 1;">Related Components</span>
+            <div class="discovery-header-actions" style="display: flex; gap: 8px; align-items: center;">
+              <button class="discovery-action-btn" @click="showAllRelated" title="Show All" style="background: none; border: none; color: inherit; cursor: pointer; opacity: 0.7; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              <button class="discovery-action-btn" @click="hideAllRelated" title="Hide All" style="background: none; border: none; color: inherit; cursor: pointer; opacity: 0.7; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+              </button>
+              <button class="discovery-close-btn" @click="activeDiscoveryComponentId = null">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="discovery-list">
+            <div v-for="comp in relatedDiscoveryComponents" :key="comp.id" class="discovery-item">
+              <div class="discovery-item-info">
+                <span class="discovery-item-name">{{ comp.name }}</span>
+                <span class="discovery-item-badge" :class="comp.direction">{{ comp.direction === 'upstream' ? 'Up' : 'Down' }}</span>
+              </div>
+              <button 
+                class="discovery-toggle-btn"
+                :class="{ 'is-visible': comp.isVisible }"
+                @click="handleToggleVisibility(comp.id)"
+                title="Toggle Visibility"
+              >
+                <svg v-if="comp.isVisible" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg v-else viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.4"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
 
     <template #main>
@@ -68,6 +107,7 @@
         <div class="editor-stage-grid" :class="`mode-${stageViewMode}`">
           <div v-if="show3DViewport" class="stage-surface stage-surface-3d">
             <div class="stage-surface-title">3D Scene</div>
+            <div v-if="isAllHidden" class="empty-scene-overlay"></div>
             <ModelSceneAsset
               v-if="structureData && structureData.components"
               ref="viewportPanel"
@@ -97,6 +137,7 @@
 
           <div v-if="show2DTwin" class="stage-surface stage-surface-2d">
             <div class="stage-surface-title">2D Topology</div>
+            <div v-if="isAllHidden" class="empty-scene-overlay"></div>
             <TopologyTwinPanel
               :structureData="structureData"
               :selected-component-id="selectedId"
@@ -289,12 +330,65 @@ const route = useRoute();
 const projectId = computed(() => props.projectId || route.query.projectId || 'model-editor-demo');
 const isReadOnly = computed(() => (props.mode || route.query.mode) === 'view');
 
+const isAllHidden = computed(() => {
+  return visibleIds.value.size === 0 && Array.isArray(structureData.value?.components) && structureData.value.components.length > 0;
+});
+
 const viewportPanel = ref(null);
 const fileInputRef = ref(null);
 const stageViewMode = ref('3d');
 const connectionRouteMode = ref('orthogonal');
 const snapToGridEnabled = ref(true);
 const isLayoutPersisting = ref(false);
+const activeDiscoveryComponentId = ref(null);
+
+const relatedDiscoveryComponents = computed(() => {
+  if (!activeDiscoveryComponentId.value || !structureData.value?.connections) {
+    return [];
+  }
+  const cid = activeDiscoveryComponentId.value;
+  const componentsMap = {};
+  (structureData.value.components || []).forEach(c => {
+    componentsMap[getSafeId(c.id)] = c;
+  });
+
+  const related = [];
+  structureData.value.connections.forEach(conn => {
+    const sourceSafe = getSafeId(conn.from);
+    const targetSafe = getSafeId(conn.to);
+    if (sourceSafe === cid && targetSafe) {
+      if (componentsMap[targetSafe]) {
+        related.push({
+          id: targetSafe,
+          name: componentsMap[targetSafe].name || targetSafe,
+          type: componentsMap[targetSafe].type || '',
+          direction: 'downstream'
+        });
+      }
+    } else if (targetSafe === cid && sourceSafe) {
+      if (componentsMap[sourceSafe]) {
+        related.push({
+          id: sourceSafe,
+          name: componentsMap[sourceSafe].name || sourceSafe,
+          type: componentsMap[sourceSafe].type || '',
+          direction: 'upstream'
+        });
+      }
+    }
+  });
+  
+  const uniqueRelated = [];
+  const seenIds = new Set();
+  related.forEach(r => {
+      if (!seenIds.has(r.id)) {
+          seenIds.add(r.id);
+          r.isVisible = visibleIds.value.has(r.id);
+          uniqueRelated.push(r);
+      }
+  });
+
+  return uniqueRelated;
+});
 
 const {
   CONNECTION_STYLES_KEY,
@@ -323,6 +417,7 @@ const {
   localNote,
   modelConfig,
   multiSelectedIds,
+  visibleIds,
   originalConfig,
   originalNote,
   persistLayoutSnapshots,
@@ -491,7 +586,10 @@ const handleTwinBatchMove = async (moves) => {
 
 const handleTreeSelect = (id) => {
   if (isReadOnly.value) return;
-  multiSelectedIds.value = new Set([getSafeId(id)]);
+  const safeId = getSafeId(id);
+  multiSelectedIds.value = new Set([safeId]);
+  activeDiscoveryComponentId.value = safeId;
+  selectedId.value = safeId;
 };
 
 const handleToggleVisibility = (id) => {
@@ -501,44 +599,66 @@ const handleToggleVisibility = (id) => {
   
   if (isBecomingVisible) {
     newVisibleIds.add(safeId);
-    
-    // Auto-discover related connections
-    if (structureData.value?.connections) {
-      const relatedIds = new Set();
-      structureData.value.connections.forEach(conn => {
-          const sourceSafe = getSafeId(conn.source);
-          const targetSafe = getSafeId(conn.target);
-          if (sourceSafe === safeId && !newVisibleIds.has(targetSafe)) relatedIds.add(targetSafe);
-          else if (targetSafe === safeId && !newVisibleIds.has(sourceSafe)) relatedIds.add(sourceSafe);
-      });
-      
-      if (relatedIds.size > 0) {
-        if (window.confirm(`Discovered ${relatedIds.size} related connected component(s). Do you want to show them now?`)) {
-          relatedIds.forEach(relId => newVisibleIds.add(relId));
-        }
-      }
-    }
   } else {
     newVisibleIds.delete(safeId);
   }
   visibleIds.value = newVisibleIds;
+  pushHistoryState();
 };
 
 const handleToggleGroupVisibility = (groupId) => {
-  const groupKey = resolveGroupKey(groupId, componentGroups.value);
-  const group = componentGroups.value[groupKey];
+  const newVisibleIds = new Set(visibleIds.value);
+  const resolvedKey = resolveGroupKey(groupId, componentGroups.value);
+  const group = componentGroups.value[resolvedKey];
   if (!group) return;
 
-  const newVisibleIds = new Set(visibleIds.value);
-  const isVisible = group.children.some(childId => newVisibleIds.has(getSafeId(childId)));
-  
-  if (isVisible) {
-      group.children.forEach(childId => newVisibleIds.delete(getSafeId(childId)));
-  } else {
-      group.children.forEach(childId => newVisibleIds.add(getSafeId(childId)));
-  }
-  
+  const children = group.children || [];
+  const someHidden = children.some(childId => !newVisibleIds.has(getSafeId(childId)));
+
+  children.forEach(childId => {
+    const sid = getSafeId(childId);
+    if (someHidden) {
+      newVisibleIds.add(sid);
+    } else {
+      newVisibleIds.delete(sid);
+    }
+  });
   visibleIds.value = newVisibleIds;
+  pushHistoryState();
+};
+
+const handleShowAll = () => {
+  const newVisibleIds = new Set(visibleIds.value);
+  if (structureData.value && structureData.value.components) {
+    structureData.value.components.forEach(c => {
+      newVisibleIds.add(getSafeId(c.id));
+    });
+  }
+  visibleIds.value = newVisibleIds;
+  pushHistoryState();
+};
+
+const handleHideAll = () => {
+  visibleIds.value = new Set();
+  pushHistoryState();
+};
+
+const showAllRelated = () => {
+  const newVisibleIds = new Set(visibleIds.value);
+  relatedDiscoveryComponents.value.forEach(c => {
+    newVisibleIds.add(getSafeId(c.id));
+  });
+  visibleIds.value = newVisibleIds;
+  pushHistoryState();
+};
+
+const hideAllRelated = () => {
+  const newVisibleIds = new Set(visibleIds.value);
+  relatedDiscoveryComponents.value.forEach(c => {
+    newVisibleIds.delete(getSafeId(c.id));
+  });
+  visibleIds.value = newVisibleIds;
+  pushHistoryState();
 };
 
 const handleTreeFocus = (id) => {
@@ -930,9 +1050,14 @@ const persistSceneDocument = async (document) => {
 
   const components = document.topology?.components || [];
 
+  const visualConfigToSave = { ...(document.visual?.modelConfig || {}) };
+  if (document.visual?.visibleIds) {
+    visualConfigToSave.visibleIds = document.visual.visibleIds;
+  }
+
   await Promise.all([
     projectApi.saveGroups(projectId.value, document.visual?.componentGroups || {}),
-    projectApi.saveVisualConfig(projectId.value, document.visual?.modelConfig || {}),
+    projectApi.saveVisualConfig(projectId.value, visualConfigToSave),
     projectApi.saveAnnotations(projectId.value, document.visual?.annotations || {}),
     ...components.map(component => projectApi.savePosition(projectId.value, {
       id: component.id,
@@ -1034,6 +1159,28 @@ watch(
   loadSelectedEditorData,
   { immediate: true, deep: false }
 );
+
+watch(selectedId, (newSelectedId) => {
+  if (newSelectedId) {
+    if (stageViewMode.value === 'code') {
+      stageViewMode.value = 'visual';
+    }
+    activeDiscoveryComponentId.value = getSafeId(newSelectedId);
+  } else {
+    activeDiscoveryComponentId.value = null;
+  }
+});
+
+watch(visibleIds, async () => {
+  if (isReadOnly.value) return;
+  const mergedConfig = { ...modelConfig.value };
+  mergedConfig['visibleIds'] = Array.from(visibleIds.value);
+  try {
+    await projectApi.saveVisualConfig(projectId.value, mergedConfig);
+  } catch (e) {
+    console.error('Failed to save visibleIds', e);
+  }
+}, { deep: true });
 
 watch(selectedId, (newSelectedId) => {
   const resolvedGroupKey = resolveSelectedGroupKey(newSelectedId);
@@ -1449,5 +1596,134 @@ watch(selectedId, (newSelectedId) => {
 
 .hidden-file-input {
   display: none;
+}
+
+.left-sidebar-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.scene-tree-section {
+  flex: 1;
+  overflow-y: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.related-discovery-panel {
+  flex-shrink: 0;
+  max-height: 240px;
+  background: rgba(13, 17, 24, 0.95);
+  display: flex;
+  flex-direction: column;
+}
+
+.discovery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.discovery-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8da2bb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.discovery-close-btn {
+  background: none;
+  border: none;
+  color: #5c7490;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.discovery-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.discovery-list {
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.discovery-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.2s;
+}
+
+.discovery-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.discovery-item-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discovery-item-name {
+  font-size: 12px;
+  color: #e5e7eb;
+}
+
+.discovery-item-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.discovery-item-badge.upstream {
+  background: rgba(43, 175, 255, 0.15);
+  color: #2bafff;
+  border: 1px solid rgba(43, 175, 255, 0.3);
+}
+
+.discovery-item-badge.downstream {
+  background: rgba(46, 213, 115, 0.15);
+  color: #2ed573;
+  border: 1px solid rgba(46, 213, 115, 0.3);
+}
+
+.discovery-toggle-btn {
+  background: none;
+  border: none;
+  color: #5c7490;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.discovery-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.discovery-toggle-btn.is-visible {
+  color: #2bafff;
 }
 </style>

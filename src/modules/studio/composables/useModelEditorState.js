@@ -32,6 +32,7 @@ export function useModelEditorState({ projectId, isReadOnly }) {
         localConnectionStyle,
         localNote,
         multiSelectedIds,
+        visibleIds,
         originalConfig,
         originalNote,
         persistLayoutSnapshots,
@@ -85,6 +86,7 @@ export function useModelEditorState({ projectId, isReadOnly }) {
                 annotations: annotations.value,
                 componentGroups: componentGroups.value,
                 expandedGroupId: expandedGroupId.value,
+                visibleIds: Array.from(visibleIds.value),
                 viewMode
             })
         };
@@ -95,8 +97,13 @@ export function useModelEditorState({ projectId, isReadOnly }) {
             normalizeSceneDocument(snapshotOrDocument?.sceneDocument || snapshotOrDocument)
         );
 
+        const loadedModelConfig = normalizedDocument.visual.modelConfig || {};
+        if (normalizedDocument.visual.visibleIds && Array.isArray(normalizedDocument.visual.visibleIds)) {
+            visibleIds.value = new Set(normalizedDocument.visual.visibleIds);
+        }
+
         structureData.value = normalizedDocument.topology;
-        modelConfig.value = normalizedDocument.visual.modelConfig || {};
+        modelConfig.value = loadedModelConfig;
         annotations.value = normalizedDocument.visual.annotations || {};
         componentGroups.value = normalizedDocument.visual.componentGroups || {};
         expandedGroupId.value = normalizedDocument.visual.expandedGroupId || null;

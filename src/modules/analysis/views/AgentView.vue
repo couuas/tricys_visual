@@ -13,6 +13,7 @@
           <TopologyTwinPanel
             :structure-data="structureData || { components: [], connections: [] }"
             :selected-component-id="selectedComponentId"
+            :visible-ids="visibleIds"
             :is-read-only="true"
             :show-controls="false"
             route-mode="orthogonal"
@@ -148,9 +149,24 @@ import { taskApi } from '../../../api/task';
 import { $notify } from '../../../utils/notification';
 import { useSessionLayoutValue } from '../../../shared/ui/composables/useSessionLayoutValue';
 
+import { normalizeSelectionId } from '../../../utils/groupIds';
+
 const route = useRoute();
 const router = useRouter();
-const { loadData, componentParams, structureData, modelMetadata } = useAnalysisWorkspace();
+const { loadData, componentParams, structureData, modelConfig, modelMetadata } = useAnalysisWorkspace();
+
+const visibleIds = computed(() => {
+  if (modelConfig.value && Array.isArray(modelConfig.value.visibleIds)) {
+    return new Set(modelConfig.value.visibleIds.map(id => normalizeSelectionId(id, {})));
+  }
+  const set = new Set();
+  if (structureData.value && Array.isArray(structureData.value.components)) {
+    structureData.value.components.forEach(c => {
+      if (c.has_layout) set.add(normalizeSelectionId(c.id, {}));
+    });
+  }
+  return set;
+});
 
 const activeTab = ref('manual');
 const selectedComponentId = ref(null);
