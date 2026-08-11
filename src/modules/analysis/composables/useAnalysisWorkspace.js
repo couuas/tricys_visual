@@ -7,7 +7,7 @@ export function useAnalysisWorkspace() {
   const modelMetadata = computed(() => {
     let modelName = currentProject.value?.simulation_config?.model_name;
     if (!modelName || modelName === 'Model') {
-      modelName = 'example_model.Cycle';
+      modelName = structureData.value?.model_name || 'example_model.Cycle';
     }
     return {
       packagePath: currentProject.value?.package_path || '',

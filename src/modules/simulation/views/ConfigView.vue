@@ -215,7 +215,7 @@ const focStopTime = computed(() => {
 });
 
 const focModelName = computed(() => {
-  return modelMetadata.value.modelName || lastSimConfig.value?.simulation?.model_name || 'example_model.Cycle';
+  return structureData.value?.model_name || modelMetadata.value.modelName || lastSimConfig.value?.simulation?.model_name || 'example_model.Cycle';
 });
 
 const rawComponentList = computed(() => {

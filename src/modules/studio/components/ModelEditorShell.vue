@@ -418,7 +418,7 @@ const resolveSelectedGroupKey = (rawId) => resolveGroupKey(rawId, componentGroup
 const normalizeWorkbenchSelectionId = (rawId) => normalizeSelectionId(rawId, componentGroups.value);
 
 const mutateLocalPositionAndSave = async (id, x, y) => {
-  const comp = structureData.value.components.find(c => c.id === id);
+  const comp = structureData.value.components.find(c => String(c.id).toLowerCase() === String(id).toLowerCase());
   if (comp) {
     comp.position.x = x;
     comp.position.y = y;
@@ -972,7 +972,7 @@ const toggleMultiSelect = (id) => {
 
 const getComponentPosition = (id) => {
   if (!structureData.value || !structureData.value.components) return 'Unknown';
-  const comp = structureData.value.components.find(c => c.id === id);
+  const comp = structureData.value.components.find(c => String(c.id).toLowerCase() === String(id).toLowerCase());
   if (!comp || !comp.position) return 'Unknown';
   return `[${comp.position.x.toFixed(2)}, ${comp.position.y.toFixed(2)}]`;
 };

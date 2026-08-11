@@ -116,7 +116,7 @@ onMounted(async () => {
   instance.on('dragEnded', (payload) => {
     emit('dragEnded', payload);
     if (props.structureData && props.structureData.components) {
-      const comp = props.structureData.components.find(c => c.id === payload.id);
+      const comp = props.structureData.components.find(c => String(c.id).toLowerCase() === String(payload.id).toLowerCase());
       if (comp && comp.position) {
         comp.position.x = payload.finalX;
         comp.position.y = payload.finalY;

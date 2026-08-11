@@ -13,14 +13,6 @@
         ></div>
 
         <aside class="simulation-workbench-right" :class="{ collapsed: rightCollapsed }" :style="rightStyle">
-          <button
-            type="button"
-            class="workbench-toggle right-toggle"
-            :title="rightCollapsed ? 'Expand right panel' : 'Collapse right panel'"
-            @click="toggleRight"
-          >
-            {{ rightCollapsed ? '‹' : '›' }}
-          </button>
           <slot name="right" />
         </aside>
       </template>

@@ -881,12 +881,12 @@ function generatePayload() {
 
     const payload = {
        type: 'BASIC',
-       name: simSettings.value.customName || `example_model.Cycle_Run_${new Date().toISOString().slice(11,19)}`,
+       name: simSettings.value.customName || `${structureData.value?.model_name || props.modelMetadata.modelName || 'example_model.Cycle'}_Run_${new Date().toISOString().slice(11,19)}`,
        project_id: router.currentRoute.value.query.projectId,
        config_json: {
            paths: { package_path: props.modelMetadata.packagePath || props.modelMetadata.modelName || null },
            simulation: {
-               model_name: props.modelMetadata.modelName || 'example_model.Cycle',
+               model_name: structureData.value?.model_name || props.modelMetadata.modelName || 'example_model.Cycle',
                stop_time: simSettings.value.stopTime,
                step_size: simSettings.value.stepSize,
                concurrent: simSettings.value.concurrent,
