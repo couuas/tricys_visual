@@ -57,7 +57,10 @@ const goviewBase = computed(() => resolveGoviewBase());
 
 const iframeSrc = computed(() => {
   try {
-    const baseUrl = goviewBase.value.endsWith('/') ? goviewBase.value : `${goviewBase.value}/`;
+    let baseUrl = goviewBase.value;
+    if (!baseUrl.endsWith('/') && !baseUrl.match(/\.html$/i)) {
+      baseUrl += '/';
+    }
     const currentHref = typeof window !== 'undefined' ? window.location.href : 'http://localhost:8080/';
     const url = new URL(baseUrl, currentHref);
 
