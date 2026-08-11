@@ -132,6 +132,7 @@ export function useModelEditorState({ projectId, isReadOnly }) {
         localNote,
         modelConfig,
         multiSelectedIds,
+        visibleIds,
         originalConfig,
         originalNote,
         persistLayoutSnapshots,

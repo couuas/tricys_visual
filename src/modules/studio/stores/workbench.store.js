@@ -5,6 +5,7 @@ export const MAX_WORKBENCH_SNAPSHOTS = 20;
 
 export function useWorkbenchStore({ projectId, structureData, modelConfig, annotations, componentGroups, getSafeId }) {
     const multiSelectedIds = ref(new Set());
+    const visibleIds = ref(new Set());
     const selectedId = ref(null);
     const selectedConnectionId = ref(null);
 
@@ -121,6 +122,7 @@ export function useWorkbenchStore({ projectId, structureData, modelConfig, annot
         () => {
             historyStack.value = [];
             historyCursor.value = -1;
+            visibleIds.value.clear();
             loadLayoutSnapshots();
         },
         { immediate: true }
@@ -135,6 +137,16 @@ export function useWorkbenchStore({ projectId, structureData, modelConfig, annot
 
             if (!historyStack.value.length) {
                 pushHistoryState(components);
+            }
+            
+            if (visibleIds.value.size === 0) {
+                 const newVisible = new Set();
+                 components.forEach(c => {
+                     if (c.has_layout) {
+                         newVisible.add(getSafeId(c.id));
+                     }
+                 });
+                 visibleIds.value = newVisible;
             }
         },
         { immediate: true }
@@ -161,7 +173,9 @@ export function useWorkbenchStore({ projectId, structureData, modelConfig, annot
         localConfig,
         localConnectionStyle,
         localNote,
+        modelConfig,
         multiSelectedIds,
+        visibleIds,
         originalConfig,
         originalNote,
         persistLayoutSnapshots,

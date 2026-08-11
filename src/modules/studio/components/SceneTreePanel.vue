@@ -41,6 +41,14 @@
                                 </span>
                                 <span class="tree-node-label">{{ group.name || group.id }}</span>
                                 <span class="tree-node-meta">{{ group.children.length }}</span>
+                                <span 
+                                    class="tree-visibility-toggle" 
+                                    @click.stop="$emit('toggleGroupVisibility', group.id)"
+                                    :title="isGroupVisible(group.id) ? 'Hide group' : 'Show group'"
+                                >
+                                    <svg v-if="isGroupVisible(group.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.4"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                </span>
                             </button>
                         </div>
 
@@ -64,6 +72,14 @@
                                     </span>
                                     <span class="tree-node-label">{{ child.label }}</span>
                                     <span class="tree-node-meta">{{ child.type }}</span>
+                                    <span 
+                                        class="tree-visibility-toggle" 
+                                        @click.stop="$emit('toggleVisibility', child.id)"
+                                        :title="isVisible(child.id) ? 'Hide component' : 'Show component'"
+                                    >
+                                        <svg v-if="isVisible(child.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                        <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.4"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                    </span>
                                 </span>
                             </button>
                         </div>
@@ -88,6 +104,14 @@
                             </span>
                             <span class="tree-node-label">{{ item.label }}</span>
                             <span class="tree-node-meta">{{ item.type }}</span>
+                            <span 
+                                class="tree-visibility-toggle" 
+                                @click.stop="$emit('toggleVisibility', item.id)"
+                                :title="isVisible(item.id) ? 'Hide component' : 'Show component'"
+                            >
+                                <svg v-if="isVisible(item.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.4"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                            </span>
                         </span>
                     </button>
                 </div>
@@ -103,14 +127,15 @@
 import { computed } from 'vue';
 import { normalizeComponentId, normalizeSelectionId, resolveGroupKey } from '../../../utils/groupIds';
 
-defineEmits(['selectItem', 'focusItem', 'toggleGroup']);
+defineEmits(['selectItem', 'focusItem', 'toggleGroup', 'toggleVisibility', 'toggleGroupVisibility']);
 
 const props = defineProps({
     components: { type: [Array, Object], default: () => [] },
     componentGroups: { type: Object, default: () => ({}) },
     selectedId: { type: String, default: null },
     expandedGroupId: { type: String, default: null },
-    multiSelectedIds: { type: [Object, Array], default: () => new Set() }
+    multiSelectedIds: { type: [Object, Array], default: () => new Set() },
+    visibleIds: { type: [Object, Array], default: () => new Set() }
 });
 
 const getComponentRawId = (component) => component?.id || component?.name || component?.label || '';
@@ -124,6 +149,26 @@ const multiSelectedIdSet = computed(() => {
     }
     return new Set();
 });
+
+const visibleIdSet = computed(() => {
+    if (props.visibleIds instanceof Set) {
+        return new Set(Array.from(props.visibleIds).map(id => normalizeSelectionId(id, props.componentGroups || {})).filter(Boolean));
+    }
+    if (Array.isArray(props.visibleIds)) {
+        return new Set(props.visibleIds.map(id => normalizeSelectionId(id, props.componentGroups || {})).filter(Boolean));
+    }
+    return new Set();
+});
+
+const isVisible = (id) => {
+    return visibleIdSet.value.has(normalizeSelectionId(id, props.componentGroups || {}));
+};
+
+const isGroupVisible = (groupId) => {
+    const group = groupEntries.value.find(g => g.id === groupId);
+    if (!group) return false;
+    return group.children.some(c => isVisible(c.id));
+};
 
 const normalizedComponents = computed(() => {
     const source = Array.isArray(props.components)
@@ -229,6 +274,37 @@ const isGroupActive = (id) => {
     border-bottom: 1px solid #1f2a36;
     font-size: 11px;
     color: #6d8299;
+}
+
+.tree-node-meta {
+    font-size: 0.85em;
+    opacity: 0.6;
+    margin-left: auto;
+    padding-left: 0.5rem;
+}
+
+.tree-visibility-toggle {
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s;
+    color: var(--text-color, #ccc);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+.tree-visibility-toggle:hover {
+    color: #fff;
+    opacity: 1 !important;
+}
+.tree-node:hover .tree-visibility-toggle,
+.tree-visibility-toggle svg {
+    opacity: 1;
+}
+.tree-node .tree-visibility-toggle svg[style*="opacity: 0.4"] {
+    opacity: 0.4;
+}
+.tree-node:hover .tree-visibility-toggle svg[style*="opacity: 0.4"]:hover {
+    opacity: 1;
 }
 
 .tree-body {

@@ -35,6 +35,7 @@ const props = defineProps({
   expandedGroupId: { type: String, default: null },
   getConnectionStyle: { type: Function, default: () => ({ width: 4.0, type: 'flow', color: 0x00d2ff, speed: 0.1, opacity: 0.8 }) },
   multiSelectedIds: { type: Set, default: () => new Set() },
+  visibleIds: { type: Set, default: () => new Set() },
   isReadOnly: { type: Boolean, default: false },
   projectId: { type: String, required: true }
 });
@@ -65,6 +66,7 @@ onMounted(async () => {
   const instance = new TopologySceneEngine({
     isReadOnly: props.isReadOnly,
     multiSelectedIds: props.multiSelectedIds,
+    visibleIds: props.visibleIds,
     BACKEND_URL: resolveBackendBase(),
     getConnectionStyle: props.getConnectionStyle
   });
@@ -170,6 +172,13 @@ watch(() => props.multiSelectedIds, (newVal) => {
   if (engine.value) {
     engine.value.updateConfig({ multiSelectedIds: newVal });
     engine.value.updateSelectionVisuals();
+  }
+});
+
+watch(() => props.visibleIds, (newVal) => {
+  if (engine.value) {
+    engine.value.updateConfig({ visibleIds: newVal });
+    engine.value.updateVisibilityVisuals();
   }
 }, { deep: true });
 

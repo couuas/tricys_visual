@@ -589,7 +589,18 @@ export class TopologySceneEngine {
                 if (c.userData && c.userData.isHighlight) highlightMesh = c;
             });
             
-            const isSelected = this.config.multiSelectedIds.has(sid);
+            let isVis = true;
+            if (this.config.visibleIds) {
+                isVis = this.config.visibleIds.has(sid);
+                if (this.isGroup(sid)) {
+                    const groupData = this.config.componentGroups[sid];
+                    if (groupData) {
+                        isVis = groupData.children.some(childId => this.config.visibleIds.has(childId.toLowerCase()));
+                    }
+                }
+            }
+
+            const isSelected = this.config.multiSelectedIds.has(sid) && isVis;
             
             if (isSelected && !highlightMesh) {
                 const w = g.userData.dimensions ? g.userData.dimensions.width + 4 : 35;
@@ -607,6 +618,64 @@ export class TopologySceneEngine {
                 if (highlightMesh.material) highlightMesh.material.dispose();
             }
         });
+    }
+
+    updateVisibilityVisuals() {
+        if (!this.config.visibleIds) return;
+        const visibleIds = this.config.visibleIds;
+
+        // Update component groups (meshes and CSS2D labels)
+        Object.keys(this.componentGroupsMap).forEach(renderId => {
+            const group = this.componentGroupsMap[renderId];
+            if (group) {
+                // Determine if this renderId is meant to be visible
+                // For a group component, visibleIds contains the original component IDs.
+                // We should check if the renderId is visible directly, OR if it's a group, if any of its children are visible.
+                let isVis = visibleIds.has(renderId);
+                if (this.isGroup(renderId)) {
+                    const groupData = this.config.componentGroups[renderId];
+                    if (groupData) {
+                        isVis = groupData.children.some(childId => visibleIds.has(childId.toLowerCase()));
+                    }
+                }
+                
+                group.visible = isVis;
+            }
+        });
+
+        // Update connections
+        this.connectionRegistry.forEach(c => {
+            const sourceRenderId = this.getRenderParentId(c.sourceId);
+            const targetRenderId = this.getRenderParentId(c.targetId);
+            
+            // Connection is visible only if BOTH source and target are visible
+            let sourceVis = visibleIds.has(sourceRenderId);
+            let targetVis = visibleIds.has(targetRenderId);
+            
+            if (this.isGroup(sourceRenderId)) {
+                const groupData = this.config.componentGroups[sourceRenderId];
+                if (groupData) sourceVis = groupData.children.some(childId => visibleIds.has(childId.toLowerCase()));
+            }
+            if (this.isGroup(targetRenderId)) {
+                const groupData = this.config.componentGroups[targetRenderId];
+                if (groupData) targetVis = groupData.children.some(childId => visibleIds.has(childId.toLowerCase()));
+            }
+            
+            const isVis = sourceVis && targetVis;
+            
+            if (c.mesh) {
+                c.mesh.visible = isVis;
+                c.mesh.traverse(child => {
+                    if (child.isCSS2DObject) {
+                        child.visible = isVis;
+                    }
+                });
+            }
+        });
+
+        if (this.bootstrap && typeof this.bootstrap.forceRender === 'function') {
+            this.bootstrap.forceRender();
+        }
     }
 
     getRenderParentId(componentId) {
@@ -667,5 +736,6 @@ export class TopologySceneEngine {
 
         this.buildConnections(structureData.connections);
         this.updateSelectionVisuals();
+        this.updateVisibilityVisuals();
     }
 }

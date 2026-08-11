@@ -24,6 +24,7 @@
         :selected-connection-id="selectedConnectionId"
         :expanded-group-id="expandedGroupId"
         :multi-selected-ids="multiSelectedIds"
+        :visible-ids="visibleIds"
         :is-selected-group="isSelectedGroup"
         :selected-group-id="selectedGroupId"
         :is-read-only="isReadOnly"
@@ -34,6 +35,8 @@
         @select-item="handleTreeSelect"
         @focus-item="handleTreeFocus"
         @toggle-group="handleTreeToggleGroup"
+        @toggle-visibility="handleToggleVisibility"
+        @toggle-group-visibility="handleToggleGroupVisibility"
         @close-selection="clearComponentSelection"
         @toggle-group-view="toggleGroupView"
         @dissolve-group="handleDissolveGroup"
@@ -76,6 +79,7 @@
               :componentGroups="componentGroups"
               :expandedGroupId="expandedGroupId"
               :multiSelectedIds="multiSelectedIds"
+              :visibleIds="visibleIds"
               :isReadOnly="isReadOnly"
               @selectComponent="handleSelectComponent"
               @selectConnection="handleSelectConnection"
@@ -100,6 +104,7 @@
               :component-groups="componentGroups"
               :multi-selected-ids="multiSelectedIds"
               :expanded-group-id="expandedGroupId"
+              :visible-ids="visibleIds"
               :annotations="annotations"
               :get-connection-style="getEditorConnectionStyle"
               :route-mode="connectionRouteMode"
@@ -485,8 +490,55 @@ const handleTwinBatchMove = async (moves) => {
 };
 
 const handleTreeSelect = (id) => {
-  if (!id) return;
-  handleSelectComponent(id);
+  if (isReadOnly.value) return;
+  multiSelectedIds.value = new Set([getSafeId(id)]);
+};
+
+const handleToggleVisibility = (id) => {
+  const safeId = getSafeId(id);
+  const newVisibleIds = new Set(visibleIds.value);
+  const isBecomingVisible = !newVisibleIds.has(safeId);
+  
+  if (isBecomingVisible) {
+    newVisibleIds.add(safeId);
+    
+    // Auto-discover related connections
+    if (structureData.value?.connections) {
+      const relatedIds = new Set();
+      structureData.value.connections.forEach(conn => {
+          const sourceSafe = getSafeId(conn.source);
+          const targetSafe = getSafeId(conn.target);
+          if (sourceSafe === safeId && !newVisibleIds.has(targetSafe)) relatedIds.add(targetSafe);
+          else if (targetSafe === safeId && !newVisibleIds.has(sourceSafe)) relatedIds.add(sourceSafe);
+      });
+      
+      if (relatedIds.size > 0) {
+        if (window.confirm(`Discovered ${relatedIds.size} related connected component(s). Do you want to show them now?`)) {
+          relatedIds.forEach(relId => newVisibleIds.add(relId));
+        }
+      }
+    }
+  } else {
+    newVisibleIds.delete(safeId);
+  }
+  visibleIds.value = newVisibleIds;
+};
+
+const handleToggleGroupVisibility = (groupId) => {
+  const groupKey = resolveGroupKey(groupId, componentGroups.value);
+  const group = componentGroups.value[groupKey];
+  if (!group) return;
+
+  const newVisibleIds = new Set(visibleIds.value);
+  const isVisible = group.children.some(childId => newVisibleIds.has(getSafeId(childId)));
+  
+  if (isVisible) {
+      group.children.forEach(childId => newVisibleIds.delete(getSafeId(childId)));
+  } else {
+      group.children.forEach(childId => newVisibleIds.add(getSafeId(childId)));
+  }
+  
+  visibleIds.value = newVisibleIds;
 };
 
 const handleTreeFocus = (id) => {
