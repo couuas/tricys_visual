@@ -92,7 +92,9 @@ const statusClass = computed(() => {
   switch(props.status) {
     case 'RUNNING': return 'running';
     case 'COMPLETED': return 'success';
-    case 'ERROR': return 'error';
+    case 'ERROR':
+    case 'FAILED': return 'error';
+    case 'STOPPED': return 'stopped';
     default: return 'pending';
   }
 });
@@ -148,6 +150,7 @@ watch(() => props.logs.length, () => {
 .status-badge.running { background: rgba(0, 210, 255, 0.1); color: #00d2ff; border: 1px solid rgba(0, 210, 255, 0.3); animation: pulse 1s infinite alternate; }
 .status-badge.success { background: rgba(0, 255, 136, 0.1); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); }
 .status-badge.error { background: rgba(255, 82, 82, 0.1); color: #ff5252; border: 1px solid rgba(255, 82, 82, 0.3); }
+.status-badge.stopped { background: rgba(255, 170, 0, 0.1); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3); }
 .status-badge.pending { background: rgba(255, 255, 255, 0.1); color: #888; border: 1px solid #444; }
 
 .section-label { font-size: 10px; color: #666; font-weight: bold; margin-bottom: 8px; }

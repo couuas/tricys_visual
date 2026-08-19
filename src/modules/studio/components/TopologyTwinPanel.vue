@@ -180,8 +180,8 @@ const props = defineProps({
         default: null
     },
     visibleIds: {
-        type: [Object, Set],
-        default: () => new Set()
+        type: [Object, Set, Array],
+        default: null
     },
     annotations: {
         type: Object,
@@ -232,10 +232,14 @@ const normalizedSelectedComponentId = computed(() => normalizeSelectionId(props.
 
 const rawComponents = computed(() => {
   const allComps = Array.isArray(props.structureData?.components) ? props.structureData.components : [];
-  if (props.visibleIds) {
+  const visibleSet = props.visibleIds instanceof Set
+    ? props.visibleIds
+    : (Array.isArray(props.visibleIds) ? new Set(props.visibleIds) : null);
+
+  if (visibleSet && visibleSet.size > 0) {
     return allComps.filter(c => {
         const sid = normalizeSelectionId(c.id || c.name, props.componentGroups || {});
-        return props.visibleIds.has(sid);
+        return visibleSet.has(sid) || visibleSet.has(String(c.id || c.name).toLowerCase());
     });
   }
   return allComps;

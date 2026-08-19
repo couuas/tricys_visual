@@ -85,7 +85,7 @@ let elapsedTimer = null;
 const fetchTasks = async () => {
   const pid = route.query.projectId;
   try {
-    const data = await taskApi.listTasks(null, 20, 0, pid || null);
+    const data = await taskApi.listTasks(null, 100, 0, pid || null);
     tasks.value = Array.isArray(data) ? data : (data.items || []);
   } catch (e) {
     console.error('Fetch tasks failed', e);
@@ -326,11 +326,22 @@ const handleStopTask = async () => {
     $notify({ title: 'READ ONLY', message: 'Preview projects cannot be stopped.', type: 'warn' });
     return;
   }
+  if (!selectedTaskId.value) {
+    return;
+  }
   try {
     await taskApi.stopTask(selectedTaskId.value);
-    $notify({ title: 'STOPPING', message: 'Stop signal sent.', type: 'process' });
+    $notify({ title: 'TERMINATING', message: 'Stop signal sent.', type: 'process' });
+    currentTask.status = 'STOPPED';
+    const task = tasks.value.find((item) => item.id === selectedTaskId.value);
+    if (task) task.status = 'STOPPED';
+    await fetchTasks();
   } catch (e) {
-    $notify({ title: 'ERROR', message: 'Stop failed', type: 'error' });
+    let msg = 'Stop failed';
+    if (e?.response?.data?.detail) {
+      msg = e.response.data.detail;
+    }
+    $notify({ title: 'ERROR', message: msg, type: 'error' });
   }
 };
 

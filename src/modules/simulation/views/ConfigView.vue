@@ -422,8 +422,7 @@ const handleSelectConnection = (id) => {
   selectedId.value = null;
 };
 const handleConfigUpdate = () => {
-  if (!selectedId.value || !sceneAssetRef.value?.focusCameraOn) return;
-  sceneAssetRef.value.focusCameraOn(selectedId.value);
+  // Keep 3D viewport unchanged upon save
 };
 const handleOpenComponentDetail = (id) => {
   if (!id) return;

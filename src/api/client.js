@@ -30,7 +30,8 @@ apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
     const status = error?.response?.status;
-    if (status === 401 || status === 403) {
+    // Only 401 Unauthorized indicates token expiration or invalidity
+    if (status === 401) {
       triggerAuthExpired('unauthorized');
     }
     console.error('API Error:', error.response || error.message);

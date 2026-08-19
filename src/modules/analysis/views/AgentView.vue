@@ -376,13 +376,49 @@ function detectStepSize(prompt) {
   return match ? Number(match[2]) : 0.5;
 }
 
+function detectStorageSourceColumn() {
+  const allVars = [];
+  if (structureData.value && Array.isArray(structureData.value.variables)) {
+    structureData.value.variables.forEach((v) => {
+      if (v && v.name) allVars.push(v.name);
+    });
+  }
+  if (components.value.length > 0) {
+    components.value.forEach((c) => {
+      const vars = c.variables || [];
+      vars.forEach((v) => allVars.push(`${c.id || c.name}.${v}`));
+    });
+  }
+
+  const candidates = [
+    'sds.inventory', 'sds.I[1]', 'sds.inv_HT', 'sds.inv_total',
+    'storage.inventory', 'storage.I[1]',
+    'tes.inventory', 'tes.I[1]',
+    'fw.inventory', 'fw.I[1]',
+    'blanket.inventory', 'blanket.I[1]'
+  ];
+
+  for (const cand of candidates) {
+    if (allVars.includes(cand)) return cand;
+  }
+
+  for (const v of allVars) {
+    if (v.endsWith('.inventory') || v.endsWith('.I[1]')) {
+      return v;
+    }
+  }
+
+  return 'sds.I[1]';
+}
+
 function buildMetricsDefinition(metrics) {
+  const sourceCol = detectStorageSourceColumn();
   const catalog = {
-    Startup_Inventory: { source_column: 'sds.I[1]', method: 'calculate_startup_inventory' },
-    Self_Sufficiency_Time: { source_column: 'sds.I[1]', method: 'time_of_turning_point' },
-    Doubling_Time: { source_column: 'sds.I[1]', method: 'calculate_doubling_time' },
+    Startup_Inventory: { source_column: sourceCol, method: 'calculate_startup_inventory' },
+    Self_Sufficiency_Time: { source_column: sourceCol, method: 'time_of_turning_point' },
+    Doubling_Time: { source_column: sourceCol, method: 'calculate_doubling_time' },
     Required_TBR: {
-      source_column: 'sds.I[1]',
+      source_column: sourceCol,
       method: 'bisection_search',
       parameter_to_optimize: 'blanket.TBR',
       search_range: [1, 1.5],
@@ -406,6 +442,19 @@ function buildAgentDraft(prompt) {
   const primaryParam = params[0] || 'blanket.T';
   const secondaryParam = params[1] || 'plasma.nf';
 
+  let resolvedFilter = 'time';
+  if (components.value.length > 0) {
+    const compFilters = components.value.map((c) => {
+      const vars = c.variables || [];
+      const rawVar = ['inventory', 'I[1]', 'inv_total', 'inv_HT', 'inflow', 'outflow'].find((v) => vars.includes(v)) || vars[0] || 'inventory';
+      const primaryVar = rawVar === 'I' ? 'I[1]' : rawVar;
+      return `${c.id || c.name}.${primaryVar}`;
+    });
+    resolvedFilter = `time|${compFilters.join('|')}`;
+  } else {
+    resolvedFilter = 'time|.*\\.inventory|.*\\.I.*';
+  }
+
   const payload = {
     type: 'ANALYSIS',
     name: `${template.toUpperCase()}_Agent_Run`,
@@ -416,7 +465,7 @@ function buildAgentDraft(prompt) {
         model_name: modelMetadata.value.modelName,
         stop_time: stopTime,
         step_size: stepSize,
-        variableFilter: 'time|sds.I[1]',
+        variableFilter: resolvedFilter,
       },
     },
   };

@@ -189,8 +189,8 @@ const handleLogin = async () => {
 };
 
 const handleRegister = async () => {
-  if (!regForm.username) {
-    errorMsg.value = 'Username required';
+  if (!regForm.username || !regForm.password) {
+    errorMsg.value = 'Username and password required';
     return;
   }
 
@@ -206,6 +206,7 @@ const handleRegister = async () => {
   }
 
   $notify({ title: 'IDENTITY CREATED', message: `Registered as ${response.user.username}.`, type: 'success' });
+  router.push({ name: 'projects' });
 };
 
 const handleLogout = async () => {

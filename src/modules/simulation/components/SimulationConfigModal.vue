@@ -189,9 +189,11 @@
                     Metrics Definition
                     <span class="count-badge" v-if="!showMetricsEditor">{{ selectedMetricKeys.length }} active</span>
                  </h3>
-                 <button @click="showMetricsEditor = !showMetricsEditor" class="link-btn">
-                   {{ showMetricsEditor ? 'Hide Editor' : 'Edit JSON' }}
-                 </button>
+                 <div class="flex-center-gap">
+                   <button @click="showMetricsEditor = !showMetricsEditor" class="link-btn">
+                     {{ showMetricsEditor ? 'Visual View' : 'Edit JSON' }}
+                   </button>
+                 </div>
                </div>
 
                <div v-if="showMetricsEditor">
@@ -203,16 +205,205 @@
                  ></textarea>
                  <div v-if="metricsError" class="error-text">{{ metricsError }}</div>
                </div>
-               <div v-else class="metrics-list">
-                 <div v-if="availableMetricKeys.length === 0" class="info-text">No metrics defined.</div>
-                 <div v-for="key in availableMetricKeys" :key="key" class="metric-item">
-                    <label class="checkbox-label">
-                       <input type="checkbox" :value="key" v-model="selectedMetricKeys" />
-                       <span class="metric-key">{{ key }}</span>
-                    </label>
-                    <span class="mini-tag">{{ metricsDefinition[key]?.method }}</span>
+               <div v-else>
+                 <!-- Metric Source Column Component -> Variable Selector (Styled as Parameter Overrides) -->
+                 <div class="add-param-box mb-3">
+                    <div class="box-label">Select Metrics Source Column (Component → Variable)</div>
+
+                    <!-- Component Input & Dropdown -->
+                    <div class="rel-container" ref="metricCompDropdownRef">
+                       <label class="mini-label">Component</label>
+                       <input
+                         v-model="metricSourceForm.componentSearch"
+                         @focus="metricSourceForm.showCompDropdown = true"
+                         placeholder="Search component..."
+                         class="input-mini"
+                       />
+                       <div v-if="metricSourceForm.showCompDropdown && filteredMetricComponents.length > 0" class="dropdown-list">
+                          <div
+                            v-for="comp in filteredMetricComponents"
+                            :key="comp"
+                            @click="selectMetricComponent(comp)"
+                            class="dropdown-item"
+                          >
+                            {{ comp }}
+                          </div>
+                       </div>
+                    </div>
+
+                    <!-- Variable Input & Dropdown (Appears after component is selected) -->
+                    <div class="rel-container" v-if="metricSourceForm.selectedComponent" ref="metricVarDropdownRef">
+                       <label class="mini-label">Variable</label>
+                       <input
+                         v-model="metricSourceForm.variableSearch"
+                         @focus="metricSourceForm.showVarDropdown = true"
+                         placeholder="Search variable..."
+                         class="input-mini"
+                       />
+                       <div v-if="metricSourceForm.showVarDropdown && filteredMetricComponentVars.length > 0" class="dropdown-list">
+                         <div
+                           v-for="v in filteredMetricComponentVars"
+                           :key="v"
+                           @click="selectMetricVariable(v)"
+                           class="dropdown-item flex-between"
+                         >
+                           <span>{{ v }}</span>
+                           <span v-if="v === metricSourceForm.selectedVariable" class="val-preview">✓ active</span>
+                         </div>
+                       </div>
+                    </div>
+
+                    <!-- Active Column Preview -->
+                    <div v-if="metricSourceForm.selectedComponent && metricSourceForm.selectedVariable" class="flex-between mt-2 pt-2 border-t-subtle">
+                       <div class="flex-center-gap">
+                         <span class="mini-label mb-0">Active Source Column:</span>
+                         <span class="mini-source-tag">{{ metricsSourceColumn }}</span>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div class="metrics-list">
+                   <div v-if="availableMetricKeys.length === 0" class="info-text">No metrics defined.</div>
+                   <div v-for="key in availableMetricKeys" :key="key" class="metric-item">
+                      <label class="checkbox-label">
+                         <input type="checkbox" :value="key" v-model="selectedMetricKeys" />
+                         <span class="metric-key">{{ key }}</span>
+                      </label>
+                      <div class="flex-center-gap">
+                        <span class="mini-source-tag" title="Source Column">{{ metricsDefinition[key]?.source_column || 'sds.I[1]' }}</span>
+                        <span class="mini-tag">{{ metricsDefinition[key]?.method }}</span>
+                      </div>
+                   </div>
                  </div>
                </div>
+            </div>
+
+            <!-- Variable Output Filter (variableFilter) Block -->
+            <div class="config-block">
+              <div class="flex-between mb-4">
+                <h3 class="block-title">
+                  Variable Output Filter (variableFilter)
+                  <span class="count-badge" v-if="!showRawVariableFilter">{{ activeFilterTokenList.length }} variables</span>
+                </h3>
+                <div class="flex-center-gap">
+                  <button @click="toggleRawVariableFilterMode" class="link-btn">
+                    {{ showRawVariableFilter ? 'Visual Selector' : 'Edit Raw Regex' }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="showRawVariableFilter">
+                <label class="mini-label">Raw Filter Regex (separated by |)</label>
+                <textarea
+                  v-model="rawVariableFilterInput"
+                  @input="syncRawToTokens"
+                  rows="3"
+                  class="textarea-code"
+                  placeholder="time|fw.inventory|sds.I[1]|.*\.I.*"
+                ></textarea>
+                <div class="field-hint">Note: OpenModelica records only variables matching this pattern. 'time' is always required.</div>
+              </div>
+
+              <div v-else>
+                <!-- Component Selector & Variable Chips -->
+                <div class="add-param-box">
+                  <div class="box-label">Select Component &amp; Variables to Record</div>
+
+                  <div class="rel-container" ref="varFilterCompDropdownRef">
+                    <label class="mini-label">Component</label>
+                    <input
+                      v-model="manualVarFilter.componentSearch"
+                      @focus="manualVarFilter.showCompDropdown = true"
+                      placeholder="Search component to view/select variables..."
+                      class="input-mini"
+                    />
+                    <div v-if="manualVarFilter.showCompDropdown && filteredVarFilterComponents.length > 0" class="dropdown-list">
+                      <div
+                        v-for="comp in filteredVarFilterComponents"
+                        :key="comp"
+                        @click="selectManualVarFilterComponent(comp)"
+                        class="dropdown-item flex-between"
+                      >
+                        <span>{{ comp }}</span>
+                        <span class="val-preview">{{ getComponentAvailableVariables(comp).length }} vars</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Variable Tags for Selected Component -->
+                  <div v-if="manualVarFilter.selectedComponent" class="component-vars-box">
+                    <div class="flex-between mb-2">
+                      <span class="mini-label">Available Variables for <strong>{{ manualVarFilter.selectedComponent }}</strong>:</span>
+                      <div class="flex-center-gap">
+                        <button type="button" @click="selectAllComponentVars(manualVarFilter.selectedComponent)" class="mini-text-btn">Select All</button>
+                        <button type="button" @click="clearComponentVars(manualVarFilter.selectedComponent)" class="mini-text-btn danger">Clear</button>
+                      </div>
+                    </div>
+
+                    <div v-if="selectedComponentAvailableVars.length > 0" class="var-chip-group">
+                      <button
+                        v-for="vName in selectedComponentAvailableVars"
+                        :key="vName"
+                        type="button"
+                        class="var-select-chip"
+                        :class="{ active: isVarTokenActive(manualVarFilter.selectedComponent, vName) }"
+                        @click="toggleVarToken(manualVarFilter.selectedComponent, vName)"
+                      >
+                        <span class="chip-status">{{ isVarTokenActive(manualVarFilter.selectedComponent, vName) ? '✓' : '+' }}</span>
+                        <span>{{ vName }}</span>
+                      </button>
+                    </div>
+                    <div v-else class="empty-hint">No variables found for this component. Add a custom variable below.</div>
+
+                    <!-- Custom Variable Input -->
+                    <div class="flex-end-gap mt-2">
+                      <div class="flex-1">
+                        <label class="mini-label">Custom Variable Name / Expression</label>
+                        <input
+                          v-model="manualVarFilter.customVarName"
+                          placeholder="e.g. inventory, I[1], custom_var"
+                          class="input-mini"
+                          @keyup.enter="addCustomVarToken"
+                        />
+                      </div>
+                      <button type="button" @click="addCustomVarToken" class="btn-mini-action">Add Variable</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Quick Presets -->
+                <div class="preset-btn-bar">
+                  <button type="button" @click="applyPrimaryPreset" class="preset-btn" title="Automatically pick the primary state variable (inventory / I[1]) for each component">
+                    ⚡ Auto Primary (inventory/I)
+                  </button>
+                  <button type="button" @click="applyAllVarsPreset" class="preset-btn" title="Select all extracted variables for all components">
+                    📦 All Component Variables
+                  </button>
+                  <button type="button" @click="applyWildcardPreset" class="preset-btn" title="Add wildcard regex matching all inventories and I variables">
+                    🌐 Wildcard Regex
+                  </button>
+                  <button type="button" @click="clearAllVarTokens" class="preset-btn reset" title="Clear all variables except time">
+                    ↺ Reset (time only)
+                  </button>
+                </div>
+
+                <!-- Active Filter Chips List -->
+                <div class="active-tokens-container">
+                  <div class="mini-label">Active Filter Variables ({{ activeFilterTokenList.length }}):</div>
+                  <div class="active-tokens-list">
+                    <span
+                      v-for="token in activeFilterTokenList"
+                      :key="token"
+                      class="active-filter-badge"
+                      :class="{ pinned: token === 'time' }"
+                    >
+                      <span v-if="token === 'time'" class="badge-icon">🔒</span>
+                      <span class="badge-text">{{ token }}</span>
+                      <button v-if="token !== 'time'" type="button" @click="removeVarToken(token)" class="badge-close-btn" title="Remove variable">×</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="config-block">
@@ -244,6 +435,26 @@
                   </div>
                 </div>
 
+                <div v-if="manualFilter.selectedComponent" class="rel-container" ref="filterVarDropdownRef">
+                  <label class="mini-label">Variable</label>
+                  <input
+                    v-model="manualFilter.variableSearch"
+                    @focus="manualFilter.showVarDropdown = true"
+                    placeholder="Select variable..."
+                    class="input-mini"
+                  />
+                  <div v-if="manualFilter.showVarDropdown && filteredFilterComponentVars.length > 0" class="dropdown-list">
+                    <div
+                      v-for="v in filteredFilterComponentVars"
+                      :key="v"
+                      @click="selectManualFilterVariable(v)"
+                      class="dropdown-item"
+                    >
+                      {{ v }}
+                    </div>
+                  </div>
+                </div>
+
                 <div v-if="manualFilter.selectedComponent" class="filter-form-grid">
                   <div>
                     <label class="mini-label">Min</label>
@@ -256,7 +467,7 @@
                 </div>
 
                 <div v-if="manualFilter.selectedComponent" class="flex-end-gap">
-                  <div class="filter-column-preview">{{ `${manualFilter.selectedComponent}.I[1]` }}</div>
+                  <div class="filter-column-preview">{{ `${manualFilter.selectedComponent}.${manualFilter.selectedVariable || getComponentPrimaryVariable(manualFilter.selectedComponent)}` }}</div>
                   <button @click="applyManualFilter" class="btn-mini-action">Apply</button>
                 </div>
               </div>
@@ -481,8 +692,22 @@ const manualFilter = ref({
   componentSearch: '',
   selectedComponent: null,
   showCompDropdown: false,
+  variableSearch: '',
+  selectedVariable: '',
+  showVarDropdown: false,
   min: '',
   max: ''
+});
+
+// Variable Output Filter (variableFilter) States
+const variableFilterTokens = ref(['time']);
+const showRawVariableFilter = ref(false);
+const rawVariableFilterInput = ref('time');
+const manualVarFilter = ref({
+  componentSearch: '',
+  selectedComponent: null,
+  showCompDropdown: false,
+  customVarName: ''
 });
 
 const showMetricsEditor = ref(false);
@@ -537,6 +762,19 @@ const flatFilterRules = computed(() => {
 });
 const selectedMetricKeys = ref([]);
 const metricsDefinition = ref({});
+const metricsSourceColumn = ref('sds.I[1]');
+
+const metricSourceForm = ref({
+  componentSearch: '',
+  selectedComponent: '',
+  variableSearch: '',
+  selectedVariable: '',
+  showCompDropdown: false,
+  showVarDropdown: false
+});
+
+const metricCompDropdownRef = ref(null);
+const metricVarDropdownRef = ref(null);
 
 const metricsJsonString = ref(JSON.stringify({
    Startup_Inventory: { source_column: 'sds.I[1]', method: 'calculate_startup_inventory' },
@@ -548,6 +786,8 @@ const metricsError = ref('');
 const compDropdownRef = ref(null);
 const paramDropdownRef = ref(null);
 const filterCompDropdownRef = ref(null);
+const filterVarDropdownRef = ref(null);
+const varFilterCompDropdownRef = ref(null);
 
 function handleClickOutside(event) {
   if (manualParam.value.showCompDropdown && compDropdownRef.value && !compDropdownRef.value.contains(event.target)) {
@@ -558,6 +798,18 @@ function handleClickOutside(event) {
   }
   if (manualFilter.value.showCompDropdown && filterCompDropdownRef.value && !filterCompDropdownRef.value.contains(event.target)) {
     manualFilter.value.showCompDropdown = false;
+  }
+  if (manualFilter.value.showVarDropdown && filterVarDropdownRef.value && !filterVarDropdownRef.value.contains(event.target)) {
+    manualFilter.value.showVarDropdown = false;
+  }
+  if (manualVarFilter.value.showCompDropdown && varFilterCompDropdownRef.value && !varFilterCompDropdownRef.value.contains(event.target)) {
+    manualVarFilter.value.showCompDropdown = false;
+  }
+  if (metricSourceForm.value.showCompDropdown && metricCompDropdownRef.value && !metricCompDropdownRef.value.contains(event.target)) {
+    metricSourceForm.value.showCompDropdown = false;
+  }
+  if (metricSourceForm.value.showVarDropdown && metricVarDropdownRef.value && !metricVarDropdownRef.value.contains(event.target)) {
+    metricSourceForm.value.showVarDropdown = false;
   }
 }
 
@@ -592,10 +844,36 @@ watch(() => props.visible, async (val) => {
       simSettings.value.concurrent = Boolean(simulation.concurrent);
       simSettings.value.maximizeWorkers = Boolean(simulation.maximize_workers);
       simSettings.value.maxWorkers = simulation.max_workers ?? null;
-      if (config.metrics_definition) {
+      
+      if (config.metrics_definition && Object.keys(config.metrics_definition).length > 0) {
         metricsJsonString.value = JSON.stringify(config.metrics_definition, null, 4);
+        const firstKey = Object.keys(config.metrics_definition)[0];
+        const srcCol = config.metrics_definition[firstKey]?.source_column || 'sds.I[1]';
+        syncMetricSourceFormFromColumn(srcCol);
+      } else {
+        const initialComp = allAvailableComponents.value.find((c) => c === 'sds') || allAvailableComponents.value[0] || 'sds';
+        const initialVar = getComponentPrimaryVariable(initialComp);
+        const initialCol = `${initialComp}.${initialVar}`;
+        syncMetricSourceFormFromColumn(initialCol);
+
+        metricsDefinition.value = {
+          Startup_Inventory: { source_column: initialCol, method: 'calculate_startup_inventory' },
+          Self_Sufficiency_Time: { source_column: initialCol, method: 'time_of_turning_point' },
+          Doubling_Time: { source_column: initialCol, method: 'calculate_doubling_time' }
+        };
+        metricsJsonString.value = JSON.stringify(metricsDefinition.value, null, 4);
       }
       showPreview.value = false;
+
+      // Initialize variableFilter tokens
+      if (simulation.variableFilter && typeof simulation.variableFilter === 'string' && simulation.variableFilter.trim()) {
+        const tokens = simulation.variableFilter.split('|').map((t) => t.trim()).filter(Boolean);
+        if (!tokens.includes('time')) tokens.unshift('time');
+        variableFilterTokens.value = tokens;
+        rawVariableFilterInput.value = tokens.join('|');
+      } else {
+        applyPrimaryPreset();
+      }
 
       if (hasInlineFocContent.value) {
         await previewNow(simSettings.value.stopTime);
@@ -627,7 +905,21 @@ watch(() => simSettings.value.maximizeWorkers, (value) => {
   }
 });
 
-const componentsList = computed(() => Object.keys(parameterList.value || {}));
+// All available component IDs
+const allAvailableComponents = computed(() => {
+  const set = new Set();
+  if (structureData.value && Array.isArray(structureData.value.components)) {
+    structureData.value.components.forEach((c) => {
+      if (c.id) set.add(c.id);
+    });
+  }
+  if (parameterList.value) {
+    Object.keys(parameterList.value).forEach((id) => set.add(id));
+  }
+  return Array.from(set);
+});
+
+const componentsList = computed(() => allAvailableComponents.value);
 
 const filteredComponents = computed(() => {
    const q = manualParam.value.componentSearch.toLowerCase();
@@ -641,6 +933,12 @@ const filteredFilterComponents = computed(() => {
   return componentsList.value.filter((component) => component.toLowerCase().includes(q));
 });
 
+const filteredVarFilterComponents = computed(() => {
+  const q = manualVarFilter.value.componentSearch.toLowerCase();
+  if (!q) return componentsList.value;
+  return componentsList.value.filter((component) => component.toLowerCase().includes(q));
+});
+
 const filteredParameters = computed(() => {
    const comp = manualParam.value.selectedComponent;
    if (!comp) return [];
@@ -649,6 +947,235 @@ const filteredParameters = computed(() => {
    if (!q) return params;
    return params.filter((param) => param.name.toLowerCase().includes(q));
 });
+
+function getComponentAvailableVariables(compId) {
+  if (!compId) return [];
+  const comp = (structureData.value?.components || []).find((c) => c.id === compId);
+  const foundVars = new Set();
+
+  // 1. From component.variables provided by backend layout_service
+  if (comp && Array.isArray(comp.variables)) {
+    comp.variables.forEach((v) => {
+      if (typeof v === 'string' && v.trim()) foundVars.add(v.trim());
+      else if (v && typeof v === 'object' && v.shortName) foundVars.add(v.shortName.trim());
+    });
+  }
+
+  // 2. From structureData.variables
+  if (Array.isArray(structureData.value?.variables)) {
+    structureData.value.variables.forEach((v) => {
+      if (v.name && v.name.startsWith(`${compId}.`)) {
+        foundVars.add(v.shortName || v.name.slice(compId.length + 1));
+      }
+    });
+  }
+
+  // 3. From component parameters in parameterList
+  if (parameterList.value && parameterList.value[compId]) {
+    parameterList.value[compId].forEach((p) => {
+      const parts = p.name.split('.');
+      const pName = parts.length > 1 ? parts.slice(1).join('.') : parts[0];
+      if (pName) foundVars.add(pName);
+    });
+  }
+
+  // 4. Fallback: Parse from source_codes if available
+  const sourceCode = structureData.value?.source_codes?.[compId];
+  if (sourceCode) {
+    const varDeclPattern = /(?:flow\s+)?(?:input\s+|output\s+)?(?:Real|Integer|Boolean|String|Modelica\.Blocks\.Interfaces\.RealOutput|Modelica\.Blocks\.Interfaces\.RealInput|TritiumStream)\s+([a-zA-Z0-9_]+)(\s*\[[^\]]+\])?/g;
+    let m;
+    while ((m = varDeclPattern.exec(sourceCode)) !== null) {
+      const vName = m[1];
+      const vDims = m[2] || '';
+      if (!['parameter', 'constant', 'import', 'annotation', 'equation', 'algorithm'].includes(vName.toLowerCase())) {
+        if (vDims) {
+          const matchNum = vDims.match(/\d+/);
+          const count = matchNum ? parseInt(matchNum[0], 10) : 1;
+          const maxCount = Math.min(count, 20);
+          for (let i = 1; i <= maxCount; i++) {
+            foundVars.add(`${vName}[${i}]`);
+          }
+        } else {
+          foundVars.add(vName);
+        }
+      }
+    }
+  }
+
+  // 5. Default candidates if nothing found
+  if (foundVars.size === 0) {
+    ['inventory', 'I[1]', 'inflow', 'outflow'].forEach((v) => foundVars.add(v));
+  }
+
+  // 6. Normalize any bare 'I' without index to 'I[1]'
+  const normalizedList = [];
+  foundVars.forEach((v) => {
+    if (v === 'I') {
+      normalizedList.push('I[1]');
+    } else {
+      normalizedList.push(v);
+    }
+  });
+
+  return normalizedList;
+}
+
+function getComponentPrimaryVariable(compId) {
+  const vars = getComponentAvailableVariables(compId);
+  if (!vars || vars.length === 0) return 'inventory';
+  const preferred = ['inventory', 'I[1]', 'inv_total', 'inv_HT', 'inv_W_total', 'inflow', 'outflow'];
+  for (const pref of preferred) {
+    if (vars.includes(pref)) return pref;
+  }
+  const first = vars[0];
+  return first === 'I' ? 'I[1]' : first;
+}
+
+const selectedComponentAvailableVars = computed(() => {
+  return getComponentAvailableVariables(manualVarFilter.value.selectedComponent);
+});
+
+const filteredFilterComponentVars = computed(() => {
+  const vars = getComponentAvailableVariables(manualFilter.value.selectedComponent);
+  const q = (manualFilter.value.variableSearch || '').toLowerCase();
+  if (!q) return vars;
+  return vars.filter((v) => v.toLowerCase().includes(q));
+});
+
+const activeFilterTokenList = computed(() => {
+  return variableFilterTokens.value;
+});
+
+function isVarTokenActive(compId, varName) {
+  const target = `${compId}.${varName}`;
+  return variableFilterTokens.value.includes(target) || variableFilterTokens.value.includes(varName);
+}
+
+function toggleVarToken(compId, varName) {
+  const target = `${compId}.${varName}`;
+  const idx = variableFilterTokens.value.indexOf(target);
+  if (idx >= 0) {
+    variableFilterTokens.value.splice(idx, 1);
+  } else {
+    variableFilterTokens.value.push(target);
+  }
+  syncTokensToRaw();
+}
+
+function selectAllComponentVars(compId) {
+  if (!compId) return;
+  const vars = getComponentAvailableVariables(compId);
+  vars.forEach((v) => {
+    const target = `${compId}.${v}`;
+    if (!variableFilterTokens.value.includes(target)) {
+      variableFilterTokens.value.push(target);
+    }
+  });
+  syncTokensToRaw();
+}
+
+function clearComponentVars(compId) {
+  if (!compId) return;
+  variableFilterTokens.value = variableFilterTokens.value.filter((token) => {
+    if (token === 'time') return true;
+    return !token.startsWith(`${compId}.`) && token !== compId;
+  });
+  syncTokensToRaw();
+}
+
+function addCustomVarToken() {
+  let raw = (manualVarFilter.value.customVarName || '').trim();
+  if (!raw) return;
+  const compId = manualVarFilter.value.selectedComponent;
+  if (raw === 'I') {
+    raw = 'I[1]';
+  } else if (raw.endsWith('.I')) {
+    raw = `${raw}[1]`;
+  }
+  const target = raw.includes('.') || !compId ? raw : `${compId}.${raw}`;
+  if (!variableFilterTokens.value.includes(target)) {
+    variableFilterTokens.value.push(target);
+  }
+  manualVarFilter.value.customVarName = '';
+  syncTokensToRaw();
+}
+
+function applyPrimaryPreset() {
+  const tokens = new Set(['time']);
+  allAvailableComponents.value.forEach((compId) => {
+    const primaryVar = getComponentPrimaryVariable(compId);
+    if (primaryVar) {
+      tokens.add(`${compId}.${primaryVar}`);
+    }
+  });
+  variableFilterTokens.value = Array.from(tokens);
+  syncTokensToRaw();
+}
+
+function applyAllVarsPreset() {
+  const tokens = new Set(['time']);
+  allAvailableComponents.value.forEach((compId) => {
+    const vars = getComponentAvailableVariables(compId);
+    vars.forEach((v) => tokens.add(`${compId}.${v}`));
+  });
+  variableFilterTokens.value = Array.from(tokens);
+  syncTokensToRaw();
+}
+
+function applyWildcardPreset() {
+  const wildcard = '.*\\.inventory|.*\\.I.*';
+  if (!variableFilterTokens.value.includes(wildcard)) {
+    variableFilterTokens.value.push(wildcard);
+  }
+  syncTokensToRaw();
+}
+
+function clearAllVarTokens() {
+  variableFilterTokens.value = ['time'];
+  syncTokensToRaw();
+}
+
+function removeVarToken(token) {
+  if (token === 'time') return;
+  variableFilterTokens.value = variableFilterTokens.value.filter((t) => t !== token);
+  syncTokensToRaw();
+}
+
+function toggleRawVariableFilterMode() {
+  showRawVariableFilter.value = !showRawVariableFilter.value;
+  if (showRawVariableFilter.value) {
+    syncTokensToRaw();
+  } else {
+    syncRawToTokens();
+  }
+}
+
+function syncTokensToRaw() {
+  if (!variableFilterTokens.value.includes('time')) {
+    variableFilterTokens.value.unshift('time');
+  }
+  rawVariableFilterInput.value = variableFilterTokens.value.join('|');
+}
+
+function syncRawToTokens() {
+  const raw = rawVariableFilterInput.value || '';
+  const tokens = raw.split('|').map((t) => t.trim()).filter(Boolean);
+  if (!tokens.includes('time')) tokens.unshift('time');
+  variableFilterTokens.value = tokens;
+}
+
+function selectManualVarFilterComponent(comp) {
+  manualVarFilter.value.selectedComponent = comp;
+  manualVarFilter.value.componentSearch = comp;
+  manualVarFilter.value.showCompDropdown = false;
+  manualVarFilter.value.customVarName = '';
+}
+
+function selectManualFilterVariable(v) {
+  manualFilter.value.selectedVariable = v;
+  manualFilter.value.variableSearch = v;
+  manualFilter.value.showVarDropdown = false;
+}
 
 function handleClose() {
   emit('close');
@@ -667,6 +1194,8 @@ function selectManualFilterComponent(comp) {
   manualFilter.value.selectedComponent = comp;
   manualFilter.value.componentSearch = comp;
   manualFilter.value.showCompDropdown = false;
+  manualFilter.value.selectedVariable = '';
+  manualFilter.value.variableSearch = '';
   manualFilter.value.min = existingRule?.min ?? '';
   manualFilter.value.max = existingRule?.max ?? '';
 }
@@ -731,9 +1260,11 @@ async function applyManualFilter() {
     if (min !== undefined && max !== undefined && min > max) {
       throw new Error('Filter min cannot be greater than max.');
     }
+    const varName = manualFilter.value.selectedVariable || getComponentPrimaryVariable(manualFilter.value.selectedComponent);
     await saveComponentFilterRule(
       manualFilter.value.selectedComponent,
-      (min !== undefined || max !== undefined) ? { min, max } : null
+      (min !== undefined || max !== undefined) ? { min, max } : null,
+      varName
     );
   } catch (err) {
     alert('Validation Error: ' + err.message);
@@ -766,12 +1297,84 @@ async function removeExistingFilter(compId) {
 
 const availableMetricKeys = computed(() => Object.keys(metricsDefinition.value || {}));
 
+const filteredMetricComponents = computed(() => {
+  const q = (metricSourceForm.value.componentSearch || '').toLowerCase();
+  if (!q) return allAvailableComponents.value;
+  return allAvailableComponents.value.filter((comp) => comp.toLowerCase().includes(q));
+});
+
+const filteredMetricComponentVars = computed(() => {
+  const vars = getComponentAvailableVariables(metricSourceForm.value.selectedComponent);
+  const q = (metricSourceForm.value.variableSearch || '').toLowerCase();
+  if (!q) return vars;
+  return vars.filter((v) => v.toLowerCase().includes(q));
+});
+
+const metricComponentQuickVars = computed(() => {
+  return getComponentAvailableVariables(metricSourceForm.value.selectedComponent);
+});
+
+function selectMetricComponent(comp) {
+  metricSourceForm.value.selectedComponent = comp;
+  metricSourceForm.value.componentSearch = comp;
+  metricSourceForm.value.showCompDropdown = false;
+  metricSourceForm.value.selectedVariable = '';
+  metricSourceForm.value.variableSearch = '';
+  metricSourceForm.value.showVarDropdown = true;
+}
+
+function selectMetricVariable(v) {
+  metricSourceForm.value.selectedVariable = v;
+  metricSourceForm.value.variableSearch = v;
+  metricSourceForm.value.showVarDropdown = false;
+  
+  const comp = metricSourceForm.value.selectedComponent;
+  if (!comp) return;
+  const col = `${comp}.${v}`;
+  metricsSourceColumn.value = col;
+  applyGlobalMetricsSourceColumn(col);
+}
+
+function syncMetricSourceFormFromColumn(col) {
+  if (!col || typeof col !== 'string') return;
+  const parts = col.split('.');
+  if (parts.length >= 2) {
+    const comp = parts[0];
+    const v = parts.slice(1).join('.');
+    metricSourceForm.value.selectedComponent = comp;
+    metricSourceForm.value.componentSearch = comp;
+    metricSourceForm.value.selectedVariable = v;
+    metricSourceForm.value.variableSearch = v;
+  } else {
+    metricSourceForm.value.selectedComponent = col;
+    metricSourceForm.value.componentSearch = col;
+  }
+  metricsSourceColumn.value = col;
+}
+
+function applyGlobalMetricsSourceColumn(col) {
+  if (!col) return;
+  const nextDef = { ...metricsDefinition.value };
+  Object.keys(nextDef).forEach((key) => {
+    nextDef[key] = {
+      ...nextDef[key],
+      source_column: col
+    };
+  });
+  metricsDefinition.value = nextDef;
+  metricsJsonString.value = JSON.stringify(nextDef, null, 4);
+}
+
 watch(metricsJsonString, (val) => {
    try {
       const parsed = JSON.parse(val);
       metricsDefinition.value = parsed;
       metricsError.value = '';
       selectedMetricKeys.value = Object.keys(parsed);
+      const firstKey = Object.keys(parsed)[0];
+      if (parsed[firstKey]?.source_column) {
+        syncMetricSourceFormFromColumn(parsed[firstKey].source_column);
+      }
    } catch (e) {
       metricsError.value = e.message;
    }
@@ -872,12 +1475,16 @@ function generatePayload() {
         }
     });
 
-    let defaultFilter = 'time';
-    if (structureData.value && structureData.value.components) {
-        structureData.value.components.forEach((component) => {
-            if (component.id) defaultFilter += `|${component.id}.I[1]`;
-        });
+    let resolvedVariableFilter = showRawVariableFilter.value
+      ? (rawVariableFilterInput.value.trim() || 'time')
+      : (variableFilterTokens.value.length > 0 ? variableFilterTokens.value.join('|') : 'time');
+
+    // Ensure 'time' is always included
+    const filterParts = resolvedVariableFilter.split('|').map((t) => t.trim()).filter(Boolean);
+    if (!filterParts.includes('time')) {
+      filterParts.unshift('time');
     }
+    resolvedVariableFilter = filterParts.join('|');
 
     const payload = {
        type: 'BASIC',
@@ -892,7 +1499,7 @@ function generatePayload() {
                concurrent: simSettings.value.concurrent,
                maximize_workers: simSettings.value.maximizeWorkers,
                ...(simSettings.value.concurrent && !simSettings.value.maximizeWorkers && simSettings.value.maxWorkers ? { max_workers: simSettings.value.maxWorkers } : {}),
-               variableFilter: defaultFilter
+               variableFilter: resolvedVariableFilter
            },
          ...(focTaskPayload.value ? { foc: focTaskPayload.value } : {}),
            simulation_parameters: simParams,
@@ -1323,5 +1930,230 @@ function buildPersistentRunConfig(configJson) {
   line-height: 1.55;
   font-family: 'JetBrains Mono', monospace;
   white-space: pre-wrap;
+}
+
+/* --- Variable Output Filter Styling --- */
+.component-vars-box {
+  background: rgba(0, 210, 255, 0.03);
+  border: 1px solid rgba(0, 210, 255, 0.15);
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.var-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.var-select-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  color: #8b949e;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.var-select-chip:hover {
+  background: #161b22;
+  color: #c9d1d9;
+  border-color: #58a6ff;
+}
+
+.var-select-chip.active {
+  background: rgba(0, 210, 255, 0.12);
+  border-color: #00d2ff;
+  color: #00d2ff;
+  font-weight: 600;
+  box-shadow: 0 0 6px rgba(0, 210, 255, 0.2);
+}
+
+.chip-status {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.preset-btn-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 12px;
+}
+
+.preset-btn {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-btn:hover {
+  background: #30363d;
+  border-color: #8b949e;
+  color: #fff;
+}
+
+.preset-btn.reset {
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+.preset-btn.reset:hover {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: #f85149;
+}
+
+.active-tokens-container {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.active-tokens-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+
+.active-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 210, 255, 0.08);
+  border: 1px solid rgba(0, 210, 255, 0.25);
+  color: #7dd3fc;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.active-filter-badge.pinned {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.badge-icon {
+  font-size: 9px;
+}
+
+.badge-close-btn {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.badge-close-btn:hover {
+  color: #f85149;
+}
+
+.mini-text-btn {
+  background: none;
+  border: none;
+  color: #00d2ff;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+}
+
+.mini-text-btn.danger {
+  color: #f85149;
+}
+
+.mini-text-btn:hover {
+  opacity: 0.8;
+}
+
+.metric-source-bar {
+  background: rgba(0, 210, 255, 0.03);
+  border: 1px solid rgba(0, 210, 255, 0.15);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.border-t-subtle {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.quick-var-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mini-var-btn {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  border-radius: 4px;
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.15s ease;
+}
+
+.mini-var-btn:hover {
+  background: #161b22;
+  color: #c9d1d9;
+  border-color: #58a6ff;
+}
+
+.mini-var-btn.active {
+  background: rgba(0, 210, 255, 0.15);
+  border-color: #00d2ff;
+  color: #00d2ff;
+  font-weight: 600;
+}
+
+.mini-source-tag {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(0, 210, 255, 0.12);
+  color: #00d2ff;
+  border: 1px solid rgba(0, 210, 255, 0.25);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.field-hint {
+  font-size: 10px;
+  color: #8b949e;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.empty-hint {
+  font-size: 11px;
+  color: #8b949e;
+  font-style: italic;
+  padding: 6px 0;
 }
 </style>

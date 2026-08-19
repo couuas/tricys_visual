@@ -22,6 +22,7 @@ export function useAuth() {
 
   const login = async (username, password) => {
     try {
+      clearAuth();
       const res = await authApi.login(username, password);
       if (res.access_token) {
         localStorage.setItem('tricys_auth_token', res.access_token);
@@ -39,6 +40,7 @@ export function useAuth() {
 
   const register = async (userData) => {
     try {
+      clearAuth();
       const res = await authApi.register(userData);
 
       if (res.status === 'success') {

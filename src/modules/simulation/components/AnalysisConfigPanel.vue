@@ -163,7 +163,7 @@
                 <span class="count-badge" v-if="!showMetricsEditor">{{ selectedMetricKeys.length }} active</span>
               </label>
               <button @click="showMetricsEditor = !showMetricsEditor" class="link-btn">
-                {{ showMetricsEditor ? 'Hide Editor' : 'Edit JSON' }}
+                {{ showMetricsEditor ? 'Visual View' : 'Edit JSON' }}
               </button>
             </div>
 
@@ -176,14 +176,75 @@
               ></textarea>
               <div v-if="metricsError" class="error-text">{{ metricsError }}</div>
             </div>
-            <div v-else class="metrics-list">
-              <div v-if="availableMetricKeys.length === 0" class="info-text">No metrics defined.</div>
-              <div v-for="key in availableMetricKeys" :key="key" class="metric-item">
-                <label class="checkbox-label">
-                  <input type="checkbox" :value="key" v-model="selectedMetricKeys" />
-                  <span class="metric-key">{{ key }}</span>
-                </label>
-                <span class="mini-tag">{{ analysisConfig.metrics_definition[key].method }}</span>
+            <div v-else>
+              <!-- Metric Source Column Component -> Variable Selector (Styled as Parameter Overrides) -->
+              <div class="add-var-box mb-3">
+                <div class="box-label">Select Metrics Source Column (Component → Variable)</div>
+
+                <!-- Component Input & Dropdown -->
+                <div class="rel-container" ref="metricCompDropdownRef">
+                  <label class="mini-label">Component</label>
+                  <input
+                    v-model="metricSourceForm.componentSearch"
+                    @focus="metricSourceForm.showCompDropdown = true"
+                    placeholder="Search component..."
+                    class="input-mini-dark"
+                  />
+                  <div v-if="metricSourceForm.showCompDropdown && filteredMetricComponents.length > 0" class="dropdown-list">
+                    <div
+                      v-for="comp in filteredMetricComponents"
+                      :key="comp"
+                      @click="selectMetricComponent(comp)"
+                      class="dropdown-item"
+                    >
+                      {{ comp }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Variable Input & Dropdown (Appears after component is selected) -->
+                <div class="rel-container" v-if="metricSourceForm.selectedComponent" ref="metricVarDropdownRef">
+                  <label class="mini-label">Variable</label>
+                  <input
+                    v-model="metricSourceForm.variableSearch"
+                    @focus="metricSourceForm.showVarDropdown = true"
+                    placeholder="Search variable..."
+                    class="input-mini-dark"
+                  />
+                  <div v-if="metricSourceForm.showVarDropdown && filteredMetricComponentVars.length > 0" class="dropdown-list">
+                    <div
+                      v-for="v in filteredMetricComponentVars"
+                      :key="v"
+                      @click="selectMetricVariable(v)"
+                      class="dropdown-item flex-between"
+                    >
+                      <span>{{ v }}</span>
+                      <span v-if="v === metricSourceForm.selectedVariable" class="val-preview">✓ active</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Active Column Preview -->
+                <div v-if="metricSourceForm.selectedComponent && metricSourceForm.selectedVariable" class="flex-between mt-2 pt-2 border-t-subtle">
+                  <div class="flex-center-gap">
+                    <span class="mini-label mb-0">Active Source Column:</span>
+                    <span class="mini-source-tag">{{ metricsSourceColumn }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="metrics-list">
+                <div v-if="availableMetricKeys.length === 0" class="info-text">No metrics defined.</div>
+                <div v-for="key in availableMetricKeys" :key="key" class="metric-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" :value="key" v-model="selectedMetricKeys" />
+                    <span class="metric-key">{{ key }}</span>
+                  </label>
+                  <div class="flex-center-gap">
+                    <span class="mini-source-tag" title="Source Column">{{ analysisConfig.metrics_definition[key]?.source_column || 'sds.I[1]' }}</span>
+                    <span class="mini-tag">{{ analysisConfig.metrics_definition[key]?.method }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -307,7 +368,7 @@ const emit = defineEmits(['close', 'analysis-started']);
 const router = useRouter();
 const route = useRoute();
 const { isAuthenticated } = useAuth();
-const { loadProjectWorkspace, componentParams } = useProjectWorkspace();
+const { loadProjectWorkspace, componentParams, structureData } = useProjectWorkspace();
 
 const showHelp = ref(false);
 const isSubmitting = ref(false);
@@ -359,6 +420,20 @@ const llmEnvConfig = ref({
   aiModel: '',
 });
 
+const metricsSourceColumn = ref('sds.I[1]');
+
+const metricSourceForm = ref({
+  componentSearch: '',
+  selectedComponent: '',
+  variableSearch: '',
+  selectedVariable: '',
+  showCompDropdown: false,
+  showVarDropdown: false
+});
+
+const metricCompDropdownRef = ref(null);
+const metricVarDropdownRef = ref(null);
+
 const metricsJsonString = ref(JSON.stringify({
   Startup_Inventory: { source_column: 'sds.I[1]', method: 'calculate_startup_inventory' },
   Self_Sufficiency_Time: { source_column: 'sds.I[1]', method: 'time_of_turning_point' },
@@ -372,6 +447,96 @@ const metricsJsonString = ref(JSON.stringify({
     max_iterations: 10,
   },
 }, null, 4));
+
+function getComponentAvailableVariables(compId) {
+  if (!compId || !structureData.value) return ['inventory', 'I[1]'];
+  const comp = Array.isArray(structureData.value.components)
+    ? structureData.value.components.find((c) => c.id === compId || c.name === compId)
+    : null;
+  if (comp && Array.isArray(comp.variables) && comp.variables.length > 0) {
+    return comp.variables;
+  }
+  return ['inventory', 'I[1]', 'inv_HT', 'inv_total', 'inflow', 'outflow'];
+}
+
+function getComponentPrimaryVariable(compId) {
+  const vars = getComponentAvailableVariables(compId);
+  if (!vars || vars.length === 0) return 'inventory';
+  const preferred = ['inventory', 'I[1]', 'inv_total', 'inv_HT', 'inflow', 'outflow'];
+  for (const pref of preferred) {
+    if (vars.includes(pref)) return pref;
+  }
+  const first = vars[0];
+  return first === 'I' ? 'I[1]' : first;
+}
+
+const filteredMetricComponents = computed(() => {
+  const q = (metricSourceForm.value.componentSearch || '').toLowerCase();
+  if (!q) return componentsList.value;
+  return componentsList.value.filter((comp) => comp.toLowerCase().includes(q));
+});
+
+const filteredMetricComponentVars = computed(() => {
+  const vars = getComponentAvailableVariables(metricSourceForm.value.selectedComponent);
+  const q = (metricSourceForm.value.variableSearch || '').toLowerCase();
+  if (!q) return vars;
+  return vars.filter((v) => v.toLowerCase().includes(q));
+});
+
+const metricComponentQuickVars = computed(() => {
+  return getComponentAvailableVariables(metricSourceForm.value.selectedComponent);
+});
+
+function selectMetricComponent(comp) {
+  metricSourceForm.value.selectedComponent = comp;
+  metricSourceForm.value.componentSearch = comp;
+  metricSourceForm.value.showCompDropdown = false;
+  metricSourceForm.value.selectedVariable = '';
+  metricSourceForm.value.variableSearch = '';
+  metricSourceForm.value.showVarDropdown = true;
+}
+
+function selectMetricVariable(v) {
+  metricSourceForm.value.selectedVariable = v;
+  metricSourceForm.value.variableSearch = v;
+  metricSourceForm.value.showVarDropdown = false;
+  
+  const comp = metricSourceForm.value.selectedComponent;
+  if (!comp) return;
+  const col = `${comp}.${v}`;
+  metricsSourceColumn.value = col;
+  applyGlobalMetricsSourceColumn(col);
+}
+
+function syncMetricSourceFormFromColumn(col) {
+  if (!col || typeof col !== 'string') return;
+  const parts = col.split('.');
+  if (parts.length >= 2) {
+    const comp = parts[0];
+    const v = parts.slice(1).join('.');
+    metricSourceForm.value.selectedComponent = comp;
+    metricSourceForm.value.componentSearch = comp;
+    metricSourceForm.value.selectedVariable = v;
+    metricSourceForm.value.variableSearch = v;
+  } else {
+    metricSourceForm.value.selectedComponent = col;
+    metricSourceForm.value.componentSearch = col;
+  }
+  metricsSourceColumn.value = col;
+}
+
+function applyGlobalMetricsSourceColumn(col) {
+  if (!col) return;
+  const nextDef = { ...analysisConfig.value.metrics_definition };
+  Object.keys(nextDef).forEach((key) => {
+    nextDef[key] = {
+      ...nextDef[key],
+      source_column: col
+    };
+  });
+  analysisConfig.value.metrics_definition = nextDef;
+  metricsJsonString.value = JSON.stringify(nextDef, null, 4);
+}
 
 const parameterList = computed(() => {
   const grouped = {};
@@ -411,6 +576,10 @@ watch(metricsJsonString, (value) => {
     analysisConfig.value.metrics_definition = parsed;
     metricsError.value = '';
     selectedMetricKeys.value = Object.keys(parsed);
+    const firstKey = Object.keys(parsed)[0];
+    if (parsed[firstKey]?.source_column) {
+      syncMetricSourceFormFromColumn(parsed[firstKey].source_column);
+    }
   } catch (error) {
     metricsError.value = error.message;
   }
@@ -430,6 +599,12 @@ function handleClickOutside(event) {
   if (analysisParam.value.showParamDropdown && paramDropdownRef.value && !paramDropdownRef.value.contains(event.target)) {
     analysisParam.value.showParamDropdown = false;
   }
+  if (metricSourceForm.value.showCompDropdown && metricCompDropdownRef.value && !metricCompDropdownRef.value.contains(event.target)) {
+    metricSourceForm.value.showCompDropdown = false;
+  }
+  if (metricSourceForm.value.showVarDropdown && metricVarDropdownRef.value && !metricVarDropdownRef.value.contains(event.target)) {
+    metricSourceForm.value.showVarDropdown = false;
+  }
 }
 
 async function initPanel() {
@@ -437,6 +612,10 @@ async function initPanel() {
   if (projectId && (!componentParams.value || componentParams.value.length === 0)) {
     await loadProjectWorkspace(projectId);
   }
+  const initialComp = componentsList.value.find((c) => c === 'sds') || componentsList.value[0] || 'sds';
+  const initialVar = getComponentPrimaryVariable(initialComp);
+  syncMetricSourceFormFromColumn(`${initialComp}.${initialVar}`);
+
   analysisConfig.value.name = `${selectedTemplate.value.toUpperCase()}_Analysis`;
   currentStep.value = 1;
   previewPayload.value = '';
@@ -526,6 +705,19 @@ function parseUserInputValue(value) {
 }
 
 function buildPayload() {
+  let resolvedFilter = 'time';
+  if (structureData.value && Array.isArray(structureData.value.components) && structureData.value.components.length > 0) {
+    const compFilters = structureData.value.components.map((c) => {
+      const vars = c.variables || [];
+      const rawVar = ['inventory', 'I[1]', 'inv_total', 'inv_HT', 'inflow', 'outflow'].find((v) => vars.includes(v)) || vars[0] || 'inventory';
+      const primaryVar = rawVar === 'I' ? 'I[1]' : rawVar;
+      return `${c.id}.${primaryVar}`;
+    });
+    resolvedFilter = `time|${compFilters.join('|')}`;
+  } else {
+    resolvedFilter = 'time|.*\\.inventory|.*\\.I.*';
+  }
+
   const payload = {
     type: 'ANALYSIS',
     name: analysisConfig.value.name,
@@ -536,7 +728,7 @@ function buildPayload() {
         model_name: props.modelMetadata.modelName || 'example_model.Cycle',
         stop_time: analysisConfig.value.stop_time,
         step_size: analysisConfig.value.step_size,
-        variableFilter: 'time|sds.I[1]',
+        variableFilter: resolvedFilter,
       },
     },
   };
@@ -729,6 +921,20 @@ async function confirmSubmit() {
 .btn-cancel { background: none; border: 1px solid transparent; color: #8b949e; padding: 8px 16px; border-radius: 4px; font-size: 13px; }
 .btn-submit { background: linear-gradient(135deg, #1f6feb, #00d2ff); border: none; color: white; padding: 8px 24px; border-radius: 4px; font-size: 13px; font-weight: 600; box-shadow: 0 4px 10px rgba(0, 210, 255, 0.2); display: flex; align-items: center; justify-content: center; }
 .btn-submit.disabled { opacity: 0.7; cursor: wait; }
+.metric-source-bar { background: rgba(0, 210, 255, 0.03); border: 1px solid rgba(0, 210, 255, 0.15); border-radius: 6px; padding: 8px 10px; }
+.border-t-subtle { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.quick-var-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.mini-var-btn { background: #0d1117; border: 1px solid #30363d; color: #8b949e; border-radius: 4px; font-size: 10px; padding: 2px 6px; cursor: pointer; font-family: 'JetBrains Mono', monospace; transition: all 0.15s ease; }
+.mini-var-btn:hover { background: #161b22; color: #c9d1d9; border-color: #58a6ff; }
+.mini-var-btn.active { background: rgba(0, 210, 255, 0.15); border-color: #00d2ff; color: #00d2ff; font-weight: 600; }
+.mini-source-tag { font-size: 10px; font-family: 'JetBrains Mono', monospace; background: rgba(0, 210, 255, 0.12); color: #00d2ff; border: 1px solid rgba(0, 210, 255, 0.25); padding: 1px 6px; border-radius: 4px; }
+.mini-text-btn { background: none; border: none; color: #00d2ff; font-size: 10px; cursor: pointer; padding: 2px 4px; text-decoration: underline; }
+.btn-mini-action { background: #1f6feb; color: white; border: none; padding: 4px 10px; border-radius: 3px; font-size: 11px; cursor: pointer; height: 28px; }
+.btn-mini-action:hover { background: #388bfd; }
+.flex-center-gap { display: flex; align-items: center; gap: 8px; }
+.input-mini { width: 100%; box-sizing: border-box; background: #080a0e; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 6px; font-size: 11px; outline: none; }
+.val-preview { color: #8b949e; font-style: italic; font-size: 11px; }
+.box-label { font-size: 11px; color: #8b949e; font-weight: 600; margin-bottom: 6px; }
 .spinner { width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
 .metrics-list { max-height: 200px; overflow-y: auto; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 5px; }
 .metric-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid #21262d; }

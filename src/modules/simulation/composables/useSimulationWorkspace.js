@@ -192,8 +192,9 @@ export function useSimulationWorkspace() {
     await projectApi.saveRunConfig(currentProjectId.value, nextConfig);
   };
 
-  const saveComponentFilterRule = async (componentId, rule) => {
-    const column = `${String(componentId || '').toLowerCase()}.I[1]`;
+  const saveComponentFilterRule = async (componentId, rule, varName = null) => {
+    const targetVar = varName ? String(varName).trim() : 'I[1]';
+    const column = targetVar.includes('.') ? targetVar : `${String(componentId || '').toLowerCase()}.${targetVar}`;
     const nextRules = filterSchema.value.filter((existing) => !Array.isArray(existing.columns) || !existing.columns.includes(column));
 
     if (rule && (rule.min !== undefined || rule.max !== undefined)) {
